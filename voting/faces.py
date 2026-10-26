@@ -7,9 +7,14 @@ cosine distance: 0 means identical, larger means less alike.
 
 import base64
 import binascii
+import logging
+import time
 
 import numpy as np
 from django.conf import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class FaceError(Exception):
@@ -43,6 +48,7 @@ def get_embedding(data_url):
     from deepface import DeepFace
 
     image = decode_data_url(data_url)
+    started = time.monotonic()
     try:
         faces = DeepFace.represent(
             img_path=image,
@@ -62,6 +68,9 @@ def get_embedding(data_url):
                 "No face was detected. Face the camera in good light, with your whole face inside the guide."
             )
         raise  # a setup problem (e.g. model download failed), not the voter's fault
+    finally:
+        # Shown in the runserver window, to tell slow face scans from a slow network.
+        logger.info("Face scan took %.1f s", time.monotonic() - started)
     if len(faces) != 1:
         raise FaceError("More than one face was detected. Only the voter should be in the frame.")
     return faces[0]["embedding"]

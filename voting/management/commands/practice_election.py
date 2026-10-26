@@ -48,6 +48,7 @@ AUDIT_ACTIONS = [
     ("accredited", "Accreditations (face matched)"),
     ("vote_cast", "Ballots cast (face matched again)"),
     ("face_mismatch", "Face did not match"),
+    ("face_closer_to_other", "Rejected: face closer to another registered student"),
     ("spoof_rejected", "Liveness check rejected (photo/screen)"),
     ("face_not_read", "No face found / photo unreadable"),
 ]
@@ -178,7 +179,7 @@ class Command(BaseCommand):
             out(f"  {entries.filter(action=action).count():>4}  {label}")
 
         matched = self._distances(entries.filter(action__in=["accredited", "vote_cast"]))
-        mismatched = self._distances(entries.filter(action="face_mismatch"))
+        mismatched = self._distances(entries.filter(action__in=["face_mismatch", "face_closer_to_other"]))
         out(f"\nFace match threshold: {settings.FACE_MATCH_THRESHOLD}")
         for label, values in (("Accepted scans", matched), ("Rejected scans", mismatched)):
             if values:

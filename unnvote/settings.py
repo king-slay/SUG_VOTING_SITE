@@ -120,3 +120,11 @@ FACE_DUPLICATE_THRESHOLD = float(os.environ.get("FACE_DUPLICATE_THRESHOLD", str(
 FACE_ANTI_SPOOFING = env_bool("FACE_ANTI_SPOOFING", True)
 # How long a voter stays verified between the face scan and submitting the ballot.
 VOTE_SESSION_MINUTES = int(os.environ.get("VOTE_SESSION_MINUTES", "10"))
+
+# Print face scan timings (voting.faces) in the server console.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"voting": {"handlers": ["console"], "level": "INFO"}},
+}
