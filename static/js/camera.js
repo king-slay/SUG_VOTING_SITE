@@ -130,9 +130,19 @@
         if (!ready || preview || busy) return;
         mark(checks.light, r.light);
         mark(checks.face, r.face);
-        var good = r.light && r.face !== false;
-        setState(good ? "good" : "warn");
-        setStatus(status, good ? readyText : r.tip);
+        if (!r.light || r.face === false) {
+          setState("warn");
+          setStatus(status, r.tip);
+        } else if (r.face === null) {
+          // This browser can't detect faces (most Android phones), so only the
+          // light was checked. Stay neutral rather than green; the server checks
+          // for a real, live face when the form is sent.
+          setState("live");
+          setStatus(status, "Light looks good. " + readyText);
+        } else {
+          setState("good");
+          setStatus(status, readyText);
+        }
       });
     }
 
