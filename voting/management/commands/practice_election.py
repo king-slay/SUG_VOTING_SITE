@@ -190,6 +190,12 @@ class Command(BaseCommand):
                 f"({100 * len(mismatched) / attempts:.0f}%). Check each in /staff/audit/: a real student "
                 "rejected is a false rejection (FRR), an impostor rejected is a correct one.")
 
+        out(f"\nDuplicate-face threshold: {settings.FACE_DUPLICATE_THRESHOLD}")
+        for action, label in (("registered", "Registered, closest other face"),
+                              ("register_duplicate_face", "Refused as duplicate")):
+            for entry in entries.filter(action=action).exclude(detail=""):
+                out(f"  {label}: {entry.reg_number} {entry.detail}")
+
         out("\nResults:")
         for position in election.positions.all():
             counts = ", ".join(f"{c.name} {c.votes.count()}" for c in position.candidates.all())

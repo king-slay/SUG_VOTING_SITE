@@ -78,9 +78,20 @@ def matches(stored_embedding, new_embedding):
     return d <= settings.FACE_MATCH_THRESHOLD, d
 
 
-def find_duplicate(new_embedding, voters):
-    """Return the first voter whose stored face is too close to new_embedding, if any."""
+def nearest_face(new_embedding, voters):
+    """Return (voter, distance) for the registered face closest to new_embedding, or (None, None)."""
+    best, best_dist = None, None
     for voter in voters:
-        if voter.face_embedding and distance(voter.face_embedding, new_embedding) <= settings.FACE_DUPLICATE_THRESHOLD:
-            return voter
-    return None
+        if voter.face_embedding:
+            d = distance(voter.face_embedding, new_embedding)
+            if best_dist is None or d < best_dist:
+                best, best_dist = voter, d
+    return best, best_dist
+
+
+def find_duplicate(new_embedding, voters):
+    """Return (voter, distance) if new_embedding is too close to a registered face, else (None, distance)."""
+    voter, d = nearest_face(new_embedding, voters)
+    if voter is not None and d <= settings.FACE_DUPLICATE_THRESHOLD:
+        return voter, d
+    return None, d

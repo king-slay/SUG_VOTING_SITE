@@ -17,10 +17,11 @@ from .models import AuditLog, Candidate, Election, Participation, Position, Vote
 from .roll import import_roll
 
 FAKE_FACES = {
-    "ada": [1.0, 0.0, 0.0],
-    "ada-again": [0.98, 0.1, 0.0],  # same person, slightly different photo
-    "bola": [0.0, 1.0, 0.0],
-    "chidi": [0.0, 0.0, 1.0],
+    "ada": [1.0, 0.0, 0.0, 0.0],
+    "ada-again": [0.98, 0.1, 0.0, 0.0],  # same person, slightly different photo
+    "ada-sibling": [0.67, 0.0, 0.0, 0.742],  # look-alike: distance 0.33 from ada
+    "bola": [0.0, 1.0, 0.0, 0.0],
+    "chidi": [0.0, 0.0, 1.0, 0.0],
 }
 
 
@@ -129,6 +130,16 @@ class RegistrationTests(TestCase):
         response = self.post(reg_number="2021/222222", full_name="Bola Ade", level="300", face_image=photo("ada-again"))
         self.assertContains(response, "already registered to another student")
         self.assertFalse(Voter.objects.get(reg_number="2021/222222").is_registered)
+        entry = AuditLog.objects.get(action="register_duplicate_face")
+        self.assertIn("face matches 2021/111111, distance 0.", entry.detail)
+
+    def test_look_alike_who_would_not_pass_as_voter_can_register(self, _):
+        # A sibling close to, but outside, the match threshold is a different person.
+        self.post()
+        response = self.post(reg_number="2021/222222", full_name="Bola Ade", level="300", face_image=photo("ada-sibling"))
+        self.assertContains(response, "on the voting list")
+        entry = AuditLog.objects.get(action="registered", reg_number="2021/222222")
+        self.assertEqual(entry.detail, "nearest other face distance 0.330")
 
     def test_no_face_detected(self, _):
         self.assertContains(self.post(face_image=photo("no-face")), "No face was detected")

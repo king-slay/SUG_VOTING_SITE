@@ -39,7 +39,7 @@ def register(request):
         try:
             embedding = faces.get_embedding(form.cleaned_data["face_image"])
             others = Voter.objects.exclude(pk=voter.pk).exclude(face_embedding=None)
-            duplicate = faces.find_duplicate(embedding, others)
+            duplicate, nearest = faces.find_duplicate(embedding, others)
         except faces.SpoofError as exc:
             log(request, "spoof_rejected", "registration", voter.reg_number)
             form.add_error(None, str(exc))
@@ -48,7 +48,10 @@ def register(request):
             form.add_error(None, str(exc))
         else:
             if duplicate:
-                log(request, "register_duplicate_face", f"face matches {duplicate.reg_number}", voter.reg_number)
+                log(
+                    request, "register_duplicate_face",
+                    f"face matches {duplicate.reg_number}, distance {nearest:.3f}", voter.reg_number,
+                )
                 form.add_error(
                     None,
                     "This face is already registered to another student. Each student can register "
@@ -62,7 +65,10 @@ def register(request):
                 photo = form.cleaned_data["face_image"].split(",", 1)[-1]
                 voter.face_photo.save(f"{uuid.uuid4().hex}.jpg", ContentFile(base64.b64decode(photo)), save=False)
                 voter.save()
-                log(request, "registered", reg_number=voter.reg_number)
+                # Distance to the most similar face already registered: shows how
+                # close look-alikes (e.g. siblings) come to the duplicate threshold.
+                detail = f"nearest other face distance {nearest:.3f}" if nearest is not None else ""
+                log(request, "registered", detail, voter.reg_number)
                 return render(request, "voting/register_done.html", {"voter": voter})
 
     roll = Voter.objects.all()
