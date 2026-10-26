@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Results | UNN SUG E-Voting{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>{{ election.title }}: final results</h1>
+  <p class="lead">Leading candidates are shown in green.</p>
+</div>
+{% include "voting/_results.html" %}
+{% endblock %}

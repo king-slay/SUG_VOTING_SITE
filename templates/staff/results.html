@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Results | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+{% include "staff/_nav.html" %}
+<div class="title-row"><h1>{{ election.title }}</h1>{% if election.status == "open" %}<span class="live"><span class="dot" aria-hidden="true"></span>Live</span>{% endif %}</div>
+<p class="lead">{{ election.get_status_display }} &middot; <span id="turnout">{{ turnout.voted }} of {{ turnout.registered }} registered voters have voted ({{ turnout.percent }}%)</span>{% if election.status == "open" %} &middot; updates every 10 seconds{% endif %}</p>
+{% include "voting/_results.html" %}
+{% endblock %}
+{% block scripts %}
+{% if election.status == "open" %}
+<script>
+  setInterval(function () {
+    fetch("{% url 'staff_results_json' election.pk %}").then(function (r) { return r.json(); }).then(function (data) {
+      var t = data.turnout;
+      document.getElementById("turnout").textContent =
+        t.voted + " of " + t.registered + " registered voters have voted (" + t.percent + "%)";
+      data.positions.forEach(function (p) {
+        var card = document.querySelector('[data-position="' + p.id + '"]');
+        if (!card) return;
+        card.querySelector("[data-cast]").textContent = p.cast;
+        p.rows.forEach(function (row) {
+          var el = card.querySelector('[data-candidate="' + row.id + '"]');
+          if (!el) return;
+          el.querySelector("[data-votes]").textContent = row.votes;
+          el.querySelector("[data-percent]").textContent = row.percent;
+          el.querySelector("[data-bar]").style.width = row.percent + "%";
+        });
+      });
+    });
+  }, 10000);
+</script>
+{% endif %}
+{% endblock %}

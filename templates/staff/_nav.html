@@ -1,0 +1,9 @@
+{% with name=request.resolver_match.url_name %}
+<nav class="tabs" aria-label="Committee">
+  <a href="{% url 'staff_dashboard' %}"{% if name == 'staff_dashboard' %} aria-current="page"{% endif %}>Dashboard</a>
+  <a href="{% url 'staff_roll_upload' %}"{% if name == 'staff_roll_upload' %} aria-current="page"{% endif %}>Voter roll</a>
+  <a href="{% url 'admin:voting_election_changelist' %}">Elections &amp; candidates</a>
+  <a href="{% url 'staff_audit' %}"{% if name == 'staff_audit' %} aria-current="page"{% endif %}>Audit log</a>
+  <a href="{% url 'admin:index' %}">Admin</a>
+</nav>
+{% endwith %}

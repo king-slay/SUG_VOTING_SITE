@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Candidates | UNN SUG E-Voting{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Candidates</h1>
+  {% if not election %}
+    <p class="lead">Candidates have not been announced yet.</p>
+  {% else %}
+    <p class="lead">{{ election.title }}</p>
+  {% endif %}
+</div>
+{% if election %}
+  {% if positions|length > 1 %}
+  <nav class="jump" aria-label="Positions">
+    {% for position in positions %}<a href="#position-{{ position.pk }}">{{ position.title }}</a>{% endfor %}
+  </nav>
+  {% endif %}
+  {% for position in positions %}
+    <section class="office" id="position-{{ position.pk }}">
+      <h2>{{ position.title }}</h2>
+      <ul class="people">
+        {% for c in position.candidates.all %}
+          <li class="person">
+            <div class="person-id">
+              {% if c.photo %}<img class="avatar lg" src="{{ c.photo.url }}" alt="">{% else %}<span class="avatar lg" aria-hidden="true">{{ c.name|slice:":1" }}</span>{% endif %}
+              <div><strong>{{ c.name }}</strong>{% if c.department %}<span class="small">{{ c.department }}</span>{% endif %}</div>
+            </div>
+            {% if c.manifesto %}<p class="manifesto">{{ c.manifesto|linebreaksbr }}</p>{% else %}<p class="manifesto muted">No manifesto published.</p>{% endif %}
+          </li>
+        {% empty %}
+          <li class="person muted">No candidates for this position yet.</li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+{% endif %}
+{% endblock %}

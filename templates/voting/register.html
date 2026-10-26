@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Register | UNN SUG E-Voting{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Register to vote</h1>
+  <p class="lead">Enter your details exactly as the electoral committee has them. They are checked against the official voter roll.</p>
+</div>
+
+<form method="post" class="split" data-face-form novalidate>
+  {% csrf_token %}
+  <div class="split-main">
+    {% include "voting/_form_errors.html" %}
+
+    <fieldset class="panel">
+      <legend>As on the voter roll</legend>
+      <div class="field">
+        <label for="id_reg_number">Registration number</label>
+        <input type="text" name="reg_number" id="id_reg_number" value="{{ form.reg_number.value|default:'' }}" placeholder="e.g. 2021/245678" autocomplete="off" spellcheck="false" required>
+        {{ form.reg_number.errors }}
+      </div>
+
+      <div class="field">
+        <label for="id_full_name">Full name</label>
+        <input type="text" name="full_name" id="id_full_name" value="{{ form.full_name.value|default:'' }}" autocomplete="name" required>
+        {{ form.full_name.errors }}
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="id_faculty">Faculty</label>
+          <select name="faculty" id="id_faculty" required>
+            <option value="">Select faculty</option>
+            {% for f in faculties %}<option{% if form.faculty.value == f %} selected{% endif %}>{{ f }}</option>{% endfor %}
+          </select>
+          {{ form.faculty.errors }}
+        </div>
+
+        <div class="field">
+          <label for="id_level">Level</label>
+          <select name="level" id="id_level" required>
+            <option value="">Select level</option>
+            {% for l in levels %}<option{% if form.level.value == l %} selected{% endif %}>{{ l }}</option>{% endfor %}
+          </select>
+          {{ form.level.errors }}
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="id_department">Department</label>
+        <input type="text" name="department" id="id_department" list="departments" value="{{ form.department.value|default:'' }}" autocomplete="off" required>
+        <datalist id="departments">{% for d in departments %}<option value="{{ d }}">{% endfor %}</datalist>
+        {{ form.department.errors }}
+      </div>
+    </fieldset>
+
+    <fieldset class="panel">
+      <legend>How we reach you</legend>
+      <div class="field-row">
+        <div class="field">
+          <label for="id_email">Email address</label>
+          <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" autocomplete="email" spellcheck="false" required>
+          {{ form.email.errors }}
+        </div>
+
+        <div class="field">
+          <label for="id_phone">Phone number</label>
+          <input type="tel" name="phone" id="id_phone" value="{{ form.phone.value|default:'' }}" autocomplete="tel" placeholder="e.g. 0803 123 4567" required>
+          {{ form.phone.errors }}
+        </div>
+      </div>
+    </fieldset>
+  </div>
+
+  <aside class="split-side">
+    <div class="panel camera-card">
+      <h2>Your face</h2>
+      {% include "voting/_camera.html" %}
+      <input type="hidden" name="face_image">
+      {{ form.face_image.errors }}
+      <div class="actions">
+        <button type="button" class="btn secondary" data-capture>Capture</button>
+        <button type="submit" class="btn">Register</button>
+      </div>
+    </div>
+  </aside>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/camera.js' %}"></script>{% endblock %}

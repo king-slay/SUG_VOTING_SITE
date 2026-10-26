@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Voter roll | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+{% include "staff/_nav.html" %}
+<div class="title-row"><h1>Upload voter roll</h1></div>
+
+{% if result and result.errors %}
+  <div class="alert error" role="alert">
+    <strong>The file was not imported. Fix these rows and upload again:</strong>
+    <ul>{% for e in result.errors|slice:":50" %}<li>{{ e }}</li>{% endfor %}</ul>
+    {% if result.errors|length > 50 %}<p>...and {{ result.errors|length|add:"-50" }} more.</p>{% endif %}
+  </div>
+{% endif %}
+
+<div class="staff-grid">
+  <form method="post" enctype="multipart/form-data" class="panel">
+    {% csrf_token %}
+    <h2>Choose a file</h2>
+    {{ form.file.errors }}
+    <div class="field">
+      <label for="id_file">Voter roll (.csv)</label>
+      <input type="file" name="file" id="id_file" accept=".csv,text/csv" required>
+    </div>
+    <div class="actions"><button type="submit" class="btn">Upload</button></div>
+  </form>
+
+  <section class="panel">
+    <h2>File format</h2>
+    <p>Upload a CSV file with exactly these column headers in the first row:</p>
+    <p class="codes">{% for h in headers %}<code>{{ h }}</code> {% endfor %}</p>
+    <p class="small">Students already on the roll (same reg number) are updated and keep their face registration. New students are added. Nothing is saved if any row has a problem.</p>
+    <a href="{% url 'staff_roll_template' %}">Download a template CSV</a>
+  </section>
+</div>
+{% endblock %}

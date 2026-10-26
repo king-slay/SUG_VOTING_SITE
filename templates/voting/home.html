@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block body_class %}page-home{% endblock %}
+{% block content %}
+<section class="hero">
+  <div class="hero-copy rise">
+    <h1>Vote for your SUG from your own phone.</h1>
+    <p class="hero-lead">Register once with your face, then vote from any phone or laptop on election day. No queues, no accreditation centre.</p>
+
+    {% if election %}
+      <p class="status-line open"><span class="dot" aria-hidden="true"></span><strong>{{ election.title }}</strong> is open for voting.</p>
+      <p class="hint">Have your registration number ready and make sure you are in good light.</p>
+      <div class="actions">
+        <a class="btn" href="{% url 'vote_start' %}">Vote now</a>
+        <a class="btn secondary" href="{% url 'candidates' %}">See candidates</a>
+      </div>
+    {% else %}
+      <p class="status-line"><span class="dot" aria-hidden="true"></span><strong>Voting is not open yet.</strong> Register now so you are on the voting list before election day.</p>
+      <div class="actions">
+        <a class="btn" href="{% url 'register' %}">Register to vote</a>
+        <a class="btn secondary" href="{% url 'candidates' %}">See candidates</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="hero-visual rise" aria-hidden="true">
+    <div class="slip">
+      <div class="slip-head">
+        <span class="slip-title">{% if election %}{{ election.title }}{% else %}Students' Union Government{% endif %}</span>
+        <span class="slip-sub">Ballot paper</span>
+      </div>
+      {% with positions=election.positions.all %}
+      {% if positions %}
+        {% for p in positions|slice:":4" %}
+          <div class="slip-row"><span>{{ p.title }}</span><span class="slip-box{% if forloop.first %} marked{% endif %}">{% if forloop.first %}{% include "voting/_thumb.html" %}{% endif %}</span></div>
+        {% endfor %}
+      {% else %}
+        <div class="slip-row"><span>President</span><span class="slip-box marked">{% include "voting/_thumb.html" %}</span></div>
+        <div class="slip-row"><span>Vice President</span><span class="slip-box"></span></div>
+        <div class="slip-row"><span>General Secretary</span><span class="slip-box"></span></div>
+      {% endif %}
+      {% endwith %}
+      <div class="slip-foot">
+        <svg viewBox="0 0 64 64" class="slip-face"><rect x="4" y="4" width="56" height="56" rx="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="10 26" stroke-dashoffset="5"/><ellipse cx="32" cy="30" rx="12" ry="15" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
+        <span>Face checked when you start and again when you submit</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="band-inner">
+    <h2>How it works</h2>
+    <ol class="flow">
+      <li>
+        <h3>Register</h3>
+        <p>Enter your details exactly as they appear on the voter roll and capture your face.</p>
+      </li>
+      <li>
+        <h3>Get accredited</h3>
+        <p>On election day, enter your registration number and scan your face.</p>
+      </li>
+      <li>
+        <h3>Vote</h3>
+        <p>Choose one candidate per position. Your face is checked again when you submit.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="secret">
+  <div class="secret-copy">
+    <h2>Your vote is secret</h2>
+    <p>The system records that you voted, so nobody can vote twice, but it never stores who you voted for alongside your identity.</p>
+  </div>
+  <ul class="secret-split" aria-label="What is stored">
+    <li><strong>Stored with your name</strong><span>That you voted, and when</span></li>
+    <li><strong>Stored without your name</strong><span>The candidates you chose</span></li>
+  </ul>
+</section>
+{% endblock %}

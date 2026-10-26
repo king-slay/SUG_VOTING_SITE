@@ -1,0 +1,8 @@
+Django>=5.1,<6
+deepface>=0.0.103  # runs the liveness model on TensorFlow, no PyTorch needed
+tensorflow
+tf-keras
+werkzeug  # imported by deepface but not declared as its dependency
+numpy
+# MySQL driver for production. On Windows, if this fails to build, use: pip install mysqlclient --only-binary :all:
+mysqlclient

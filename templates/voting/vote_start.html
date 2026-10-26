@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Vote | UNN SUG E-Voting{% endblock %}
+{% block content %}
+<div class="page-head">
+  {% include "voting/_steps.html" with step=1 %}
+  <h1>{{ election.title }}</h1>
+  <p class="lead">First, confirm it's you. Enter your registration number and scan your face.</p>
+</div>
+
+<form method="post" class="split" data-face-form novalidate>
+  {% csrf_token %}
+  <div class="split-main">
+    {% include "voting/_form_errors.html" %}
+    <div class="panel">
+      <div class="field">
+        <label for="id_reg_number">Registration number</label>
+        <input class="input-lg" type="text" name="reg_number" id="id_reg_number" value="{{ form.reg_number.value|default:'' }}" placeholder="e.g. 2021/245678" autocomplete="off" spellcheck="false" required autofocus>
+        {{ form.reg_number.errors }}
+      </div>
+      <p class="note">After the scan you have a few minutes to mark and submit your ballot. Your face is checked once more when you submit.</p>
+    </div>
+  </div>
+
+  <aside class="split-side">
+    <div class="panel camera-card">
+      <h2>Scan your face</h2>
+      {% include "voting/_camera.html" %}
+      <input type="hidden" name="face_image">
+      {{ form.face_image.errors }}
+      <div class="actions">
+        <button type="button" class="btn secondary" data-capture>Capture</button>
+        <button type="submit" class="btn">Continue to ballot</button>
+      </div>
+    </div>
+  </aside>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/camera.js' %}"></script>{% endblock %}

@@ -1,0 +1,18 @@
+<div class="camera-panel">
+  <div class="camera" data-camera data-state="starting">
+    <video autoplay playsinline muted></video>
+    <svg class="guide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <path class="guide-shade" fill-rule="evenodd" d="M0 0H100V100H0Z M18 46a32 33 0 1 0 64 0a32 33 0 1 0 -64 0Z"/>
+      <ellipse class="guide-oval" cx="50" cy="46" rx="32" ry="33" vector-effect="non-scaling-stroke"/>
+    </svg>
+    <div class="scan" aria-hidden="true"></div>
+    <div class="flash" aria-hidden="true"></div>
+    <span class="camera-badge" aria-hidden="true">Photo taken</span>
+  </div>
+  <p class="camera-status" data-camera-status role="status" aria-live="polite">Starting camera...</p>
+  <ul class="checks" aria-label="Before you capture">
+    <li data-check="light">Bright, even light on your face</li>
+    <li data-check="face">Your whole face inside the oval</li>
+    <li>No cap, sunglasses or face mask, and nobody else in view</li>
+  </ul>
+</div>

@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block main_class %}narrow{% endblock %}
+{% block content %}
+<div class="done-page">
+  <div class="done-mark stamp" aria-hidden="true">{% include "voting/_thumb.html" %}</div>
+  <h1>Your vote has been recorded</h1>
+  <p class="lead">Thank you, {{ voter.full_name }}. Your ballot for {{ election.title }} was submitted successfully.</p>
+  <p>You can close this page.</p>
+  <div class="actions"><a class="btn" href="{% url 'home' %}">Back to home</a></div>
+</div>
+{% endblock %}

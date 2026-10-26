@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Committee dashboard | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+{% include "staff/_nav.html" %}
+<div class="title-row">
+  <h1>Electoral committee</h1>
+  {% if election %}<a class="btn" href="{% url 'staff_results' election.pk %}">Live results</a>{% endif %}
+</div>
+
+<div class="kpis">
+  <div class="kpi"><span class="label">Students on voter roll</span><span class="value">{{ roll_count }}</span></div>
+  <div class="kpi"><span class="label">Registered with face</span><span class="value">{{ registered_count }}</span></div>
+  {% if turnout %}
+  <div class="kpi"><span class="label">Voted in {{ election.title }}</span><span class="value">{{ turnout.voted }} <span class="unit">{{ turnout.percent }}% turnout</span></span></div>
+  {% endif %}
+</div>
+
+<div class="staff-grid">
+  <section class="panel">
+    <h2>Elections</h2>
+    {% if elections %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Title</th><th>Status</th><th><span class="sr-only">Links</span></th></tr></thead>
+        <tbody>
+        {% for e in elections %}
+          <tr>
+            <td>{{ e.title }}</td>
+            <td><span class="pill {{ e.status }}">{{ e.get_status_display }}</span></td>
+            <td class="links"><a href="{% url 'staff_results' e.pk %}">Results</a> <a href="{% url 'admin:voting_election_change' e.pk %}">Edit</a></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p>No elections yet. <a href="{% url 'admin:voting_election_add' %}">Create one</a>, add positions, then add candidates to each position.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Running an election</h2>
+    <ol class="steps">
+      <li>Upload the voter roll CSV.</li>
+      <li>Students register with their details and face. Registration closes automatically once voting opens.</li>
+      <li>Create the election, its positions and candidates in the admin.</li>
+      <li>On election day, select the election in the admin and run <em>Open voting</em>. Run <em>Close voting</em> when polls close.</li>
+      <li>Watch live results here; tick <em>Results public</em> after closing to publish them.</li>
+    </ol>
+  </section>
+</div>
+{% endblock %}

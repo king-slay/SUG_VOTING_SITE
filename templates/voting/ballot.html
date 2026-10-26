@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Ballot | UNN SUG E-Voting{% endblock %}
+{% block content %}
+<div class="page-head">
+  {% include "voting/_steps.html" with step=2 %}
+  <h1>{{ election.title }}</h1>
+  <p class="lead">Choose one candidate for each position. Voting as <strong>{{ voter.full_name }}</strong> ({{ voter.reg_number }}).</p>
+</div>
+
+<form method="post" class="split ballot" data-face-form data-capture-on-submit>
+  {% csrf_token %}
+  <div class="split-main">
+    {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+
+    {% for position in positions %}
+      <fieldset class="position" data-position-title="{{ position.title }}">
+        <legend><h2>{{ position.title }}</h2></legend>
+        <div class="choices">
+          {% for c in position.candidates.all %}
+            <label class="choice">
+              <input type="radio" name="position_{{ position.pk }}" value="{{ c.pk }}" data-name="{{ c.name }}" required
+                {% for pid, cid in selected.items %}{% if pid == position.pk and cid == c.pk %}checked{% endif %}{% endfor %}>
+              <span class="choice-body">
+                {% if c.photo %}<img class="avatar" src="{{ c.photo.url }}" alt="">{% else %}<span class="avatar" aria-hidden="true">{{ c.name|slice:":1" }}</span>{% endif %}
+                <span class="choice-name">{{ c.name }}{% if c.department %}<span class="small">{{ c.department }}</span>{% endif %}</span>
+                <span class="choice-box" aria-hidden="true">{% include "voting/_thumb.html" %}</span>
+              </span>
+            </label>
+          {% endfor %}
+        </div>
+      </fieldset>
+    {% endfor %}
+  </div>
+
+  <aside class="split-side">
+    <div class="panel camera-card">
+      <h2>Confirm and submit</h2>
+      <ul class="summary" data-summary aria-live="polite">
+        {% for position in positions %}
+          <li data-for="position_{{ position.pk }}"><span>{{ position.title }}</span><strong>Not chosen yet</strong></li>
+        {% endfor %}
+      </ul>
+      <p class="note">Your face is checked again when you submit. Keep it inside the oval. You cannot change your vote after submitting.</p>
+      {% include "voting/_camera.html" %}
+      <input type="hidden" name="face_image">
+      <button type="submit" class="btn block">Submit my vote</button>
+    </div>
+  </aside>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/camera.js' %}"></script>
+<script>
+  (function () {
+    var form = document.querySelector("form.ballot");
+    function update() {
+      form.querySelectorAll("[data-summary] li").forEach(function (li) {
+        var picked = form.querySelector('input[name="' + li.dataset.for + '"]:checked');
+        li.querySelector("strong").textContent = picked ? picked.dataset.name : "Not chosen yet";
+        li.classList.toggle("chosen", !!picked);
+      });
+    }
+    form.addEventListener("change", update);
+    update();
+  })();
+</script>
+{% endblock %}

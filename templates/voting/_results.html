@@ -1,0 +1,19 @@
+<div class="results">
+{% for r in results %}
+  <section class="panel result" data-position="{{ r.position.pk }}">
+    <div class="result-head">
+      <h2>{{ r.position.title }}</h2>
+      <p class="small"><span data-cast>{{ r.cast }}</span> votes cast</p>
+    </div>
+    {% for row in r.rows %}
+      <div class="result-row{% if row.leading %} leading{% endif %}" data-candidate="{{ row.candidate.pk }}">
+        <div class="top">
+          <span class="who">{{ row.candidate.name }}</span>
+          <span class="num"><strong data-votes>{{ row.votes }}</strong> <span class="pct">(<span data-percent>{{ row.percent }}</span>%)</span></span>
+        </div>
+        <div class="bar"><div data-bar style="width: {{ row.percent }}%"></div></div>
+      </div>
+    {% endfor %}
+  </section>
+{% endfor %}
+</div>
