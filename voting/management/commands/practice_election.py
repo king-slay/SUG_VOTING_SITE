@@ -48,6 +48,7 @@ AUDIT_ACTIONS = [
     ("accredited", "Accreditations (face matched)"),
     ("vote_cast", "Ballots cast (face matched again)"),
     ("face_mismatch", "Face did not match"),
+    ("face_closer_to_other", "Rejected: face closer to another registered student"),
     ("spoof_rejected", "Liveness check rejected (photo/screen)"),
     ("face_not_read", "No face found / photo unreadable"),
 ]
@@ -178,7 +179,7 @@ class Command(BaseCommand):
             out(f"  {entries.filter(action=action).count():>4}  {label}")
 
         matched = self._distances(entries.filter(action__in=["accredited", "vote_cast"]))
-        mismatched = self._distances(entries.filter(action="face_mismatch"))
+        mismatched = self._distances(entries.filter(action__in=["face_mismatch", "face_closer_to_other"]))
         out(f"\nFace match threshold: {settings.FACE_MATCH_THRESHOLD}")
         for label, values in (("Accepted scans", matched), ("Rejected scans", mismatched)):
             if values:
@@ -189,6 +190,12 @@ class Command(BaseCommand):
             out(f"  Wrong-face rejections: {len(mismatched)} of {attempts} scans "
                 f"({100 * len(mismatched) / attempts:.0f}%). Check each in /staff/audit/: a real student "
                 "rejected is a false rejection (FRR), an impostor rejected is a correct one.")
+
+        out(f"\nDuplicate-face threshold: {settings.FACE_DUPLICATE_THRESHOLD}")
+        for action, label in (("registered", "Registered, closest other face"),
+                              ("register_duplicate_face", "Refused as duplicate")):
+            for entry in entries.filter(action=action).exclude(detail=""):
+                out(f"  {label}: {entry.reg_number} {entry.detail}")
 
         out("\nResults:")
         for position in election.positions.all():

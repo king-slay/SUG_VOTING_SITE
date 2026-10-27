@@ -123,7 +123,7 @@ conditions; the voter just tries again in better light. Turn it off with
 | `FACE_MODEL` | `Facenet512` | DeepFace model |
 | `FACE_DETECTOR` | `retinaface` | DeepFace face detector (`opencv` is faster but misses more faces) |
 | `FACE_MATCH_THRESHOLD` | `0.30` | Max cosine distance to accept a face match |
-| `FACE_DUPLICATE_THRESHOLD` | `0.35` | Distance under which a new registration counts as an already-registered face |
+| `FACE_DUPLICATE_THRESHOLD` | same as `FACE_MATCH_THRESHOLD` | Distance under which a new registration counts as an already-registered face |
 | `FACE_ANTI_SPOOFING` | `true` | Liveness check that rejects photos and screens held up to the camera |
 | `VOTE_SESSION_MINUTES` | `10` | Time allowed between accreditation and submitting the ballot |
 

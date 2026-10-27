@@ -111,11 +111,20 @@ FACE_MODEL = os.environ.get("FACE_MODEL", "Facenet512")
 FACE_DETECTOR = os.environ.get("FACE_DETECTOR", "retinaface")
 FACE_MATCH_THRESHOLD = float(os.environ.get("FACE_MATCH_THRESHOLD", "0.30"))
 # Threshold for refusing a registration because the face already belongs to
-# another registered voter (one person, one registration). Kept a little looser
-# than the match threshold so the same person in a new photo is still caught.
-FACE_DUPLICATE_THRESHOLD = float(os.environ.get("FACE_DUPLICATE_THRESHOLD", "0.35"))
+# another registered voter (one person, one registration). It equals the match
+# threshold: a face is a duplicate exactly when it would pass as that voter on
+# election day. A looser value blocked real siblings in the practice run.
+FACE_DUPLICATE_THRESHOLD = float(os.environ.get("FACE_DUPLICATE_THRESHOLD", str(FACE_MATCH_THRESHOLD)))
 # DeepFace's anti-spoofing (liveness) check: rejects photos and screens held up to
 # the camera. Runs on TensorFlow. Set to false only for local debugging.
 FACE_ANTI_SPOOFING = env_bool("FACE_ANTI_SPOOFING", True)
 # How long a voter stays verified between the face scan and submitting the ballot.
 VOTE_SESSION_MINUTES = int(os.environ.get("VOTE_SESSION_MINUTES", "10"))
+
+# Print face scan timings (voting.faces) in the server console.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"voting": {"handlers": ["console"], "level": "INFO"}},
+}

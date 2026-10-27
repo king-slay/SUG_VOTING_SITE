@@ -19,8 +19,9 @@ from .results import tally
 
 MAX_FAILED_SCANS = 5
 LOCKOUT_MINUTES = 15
-# Audit actions that count towards the lockout: a wrong face, or a photo/screen held up to the camera.
-FAILED_SCAN_ACTIONS = ("face_mismatch", "spoof_rejected")
+# Audit actions that count towards the lockout: a wrong face, a face that looks more like
+# another registered student (e.g. a sibling), or a photo/screen held up to the camera.
+FAILED_SCAN_ACTIONS = ("face_mismatch", "face_closer_to_other", "spoof_rejected")
 SESSION_KEYS = ("vote_voter_id", "vote_election_id", "vote_verified_at")
 
 
@@ -39,7 +40,7 @@ def register(request):
         try:
             embedding = faces.get_embedding(form.cleaned_data["face_image"])
             others = Voter.objects.exclude(pk=voter.pk).exclude(face_embedding=None)
-            duplicate = faces.find_duplicate(embedding, others)
+            duplicate, nearest = faces.find_duplicate(embedding, others)
         except faces.SpoofError as exc:
             log(request, "spoof_rejected", "registration", voter.reg_number)
             form.add_error(None, str(exc))
@@ -48,7 +49,10 @@ def register(request):
             form.add_error(None, str(exc))
         else:
             if duplicate:
-                log(request, "register_duplicate_face", f"face matches {duplicate.reg_number}", voter.reg_number)
+                log(
+                    request, "register_duplicate_face",
+                    f"face matches {duplicate.reg_number}, distance {nearest:.3f}", voter.reg_number,
+                )
                 form.add_error(
                     None,
                     "This face is already registered to another student. Each student can register "
@@ -62,7 +66,10 @@ def register(request):
                 photo = form.cleaned_data["face_image"].split(",", 1)[-1]
                 voter.face_photo.save(f"{uuid.uuid4().hex}.jpg", ContentFile(base64.b64decode(photo)), save=False)
                 voter.save()
-                log(request, "registered", reg_number=voter.reg_number)
+                # Distance to the most similar face already registered: shows how
+                # close look-alikes (e.g. siblings) come to the duplicate threshold.
+                detail = f"nearest other face distance {nearest:.3f}" if nearest is not None else ""
+                log(request, "registered", detail, voter.reg_number)
                 return render(request, "voting/register_done.html", {"voter": voter})
 
     roll = Voter.objects.all()
@@ -95,7 +102,8 @@ def _check_face(request, voter, data_url):
     if _too_many_failures(voter.reg_number):
         return f"Too many failed face scans. Try again in {LOCKOUT_MINUTES} minutes or see an electoral officer.", None
     try:
-        ok, dist = faces.matches(voter.face_embedding, faces.get_embedding(data_url))
+        embedding = faces.get_embedding(data_url)
+        ok, dist = faces.matches(voter.face_embedding, embedding)
     except faces.SpoofError as exc:
         log(request, "spoof_rejected", "election day", voter.reg_number)
         return str(exc), None
@@ -104,6 +112,15 @@ def _check_face(request, voter, data_url):
         return str(exc), None
     if not ok:
         log(request, "face_mismatch", f"distance {dist:.3f}", voter.reg_number)
+        return "Your face did not match the registered face for this registration number. Please try again.", dist
+    # A look-alike (e.g. a sibling) can come under the threshold for someone else's
+    # registration, but their own registered face is still the closer one.
+    other, other_dist = faces.nearest_face(embedding, Voter.objects.exclude(pk=voter.pk).exclude(face_embedding=None))
+    if other is not None and other_dist <= dist:
+        log(
+            request, "face_closer_to_other",
+            f"distance {dist:.3f}, but {other_dist:.3f} to {other.reg_number}", voter.reg_number,
+        )
         return "Your face did not match the registered face for this registration number. Please try again.", dist
     return None, dist
 

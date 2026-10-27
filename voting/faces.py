@@ -7,9 +7,14 @@ cosine distance: 0 means identical, larger means less alike.
 
 import base64
 import binascii
+import logging
+import time
 
 import numpy as np
 from django.conf import settings
+
+
+logger = logging.getLogger(__name__)
 
 
 class FaceError(Exception):
@@ -43,6 +48,7 @@ def get_embedding(data_url):
     from deepface import DeepFace
 
     image = decode_data_url(data_url)
+    started = time.monotonic()
     try:
         faces = DeepFace.represent(
             img_path=image,
@@ -62,6 +68,9 @@ def get_embedding(data_url):
                 "No face was detected. Face the camera in good light, with your whole face inside the guide."
             )
         raise  # a setup problem (e.g. model download failed), not the voter's fault
+    finally:
+        # Shown in the runserver window, to tell slow face scans from a slow network.
+        logger.info("Face scan took %.1f s", time.monotonic() - started)
     if len(faces) != 1:
         raise FaceError("More than one face was detected. Only the voter should be in the frame.")
     return faces[0]["embedding"]
@@ -78,9 +87,20 @@ def matches(stored_embedding, new_embedding):
     return d <= settings.FACE_MATCH_THRESHOLD, d
 
 
-def find_duplicate(new_embedding, voters):
-    """Return the first voter whose stored face is too close to new_embedding, if any."""
+def nearest_face(new_embedding, voters):
+    """Return (voter, distance) for the registered face closest to new_embedding, or (None, None)."""
+    best, best_dist = None, None
     for voter in voters:
-        if voter.face_embedding and distance(voter.face_embedding, new_embedding) <= settings.FACE_DUPLICATE_THRESHOLD:
-            return voter
-    return None
+        if voter.face_embedding:
+            d = distance(voter.face_embedding, new_embedding)
+            if best_dist is None or d < best_dist:
+                best, best_dist = voter, d
+    return best, best_dist
+
+
+def find_duplicate(new_embedding, voters):
+    """Return (voter, distance) if new_embedding is too close to a registered face, else (None, distance)."""
+    voter, d = nearest_face(new_embedding, voters)
+    if voter is not None and d <= settings.FACE_DUPLICATE_THRESHOLD:
+        return voter, d
+    return None, d

@@ -17,10 +17,13 @@ from .models import AuditLog, Candidate, Election, Participation, Position, Vote
 from .roll import import_roll
 
 FAKE_FACES = {
-    "ada": [1.0, 0.0, 0.0],
-    "ada-again": [0.98, 0.1, 0.0],  # same person, slightly different photo
-    "bola": [0.0, 1.0, 0.0],
-    "chidi": [0.0, 0.0, 1.0],
+    "ada": [1.0, 0.0, 0.0, 0.0],
+    "ada-again": [0.98, 0.1, 0.0, 0.0],  # same person, slightly different photo
+    "ada-sibling": [0.67, 0.0, 0.0, 0.742],  # look-alike: distance 0.33 from ada
+    "ada-twin": [0.8, 0.0, 0.0, 0.6],  # registered look-alike: distance 0.20 from ada
+    "ada-twin-again": [0.85, 0.0, 0.0, 0.53],  # the twin on election day: 0.15 from ada, 0.004 from own face
+    "bola": [0.0, 1.0, 0.0, 0.0],
+    "chidi": [0.0, 0.0, 1.0, 0.0],
 }
 
 
@@ -129,6 +132,16 @@ class RegistrationTests(TestCase):
         response = self.post(reg_number="2021/222222", full_name="Bola Ade", level="300", face_image=photo("ada-again"))
         self.assertContains(response, "already registered to another student")
         self.assertFalse(Voter.objects.get(reg_number="2021/222222").is_registered)
+        entry = AuditLog.objects.get(action="register_duplicate_face")
+        self.assertIn("face matches 2021/111111, distance 0.", entry.detail)
+
+    def test_look_alike_who_would_not_pass_as_voter_can_register(self, _):
+        # A sibling close to, but outside, the match threshold is a different person.
+        self.post()
+        response = self.post(reg_number="2021/222222", full_name="Bola Ade", level="300", face_image=photo("ada-sibling"))
+        self.assertContains(response, "on the voting list")
+        entry = AuditLog.objects.get(action="registered", reg_number="2021/222222")
+        self.assertEqual(entry.detail, "nearest other face distance 0.330")
 
     def test_no_face_detected(self, _):
         self.assertContains(self.post(face_image=photo("no-face")), "No face was detected")
@@ -185,6 +198,16 @@ class VotingTests(TestCase):
         response = self.accredit(face="bola")
         self.assertContains(response, "did not match")
         self.assertEqual(self.client.get(reverse("ballot")).status_code, 302)
+
+    def test_look_alike_cannot_vote_as_someone_else(self, _):
+        # Bola's sibling-like face passes Ada's threshold but is closer to Bola's own registration.
+        Voter.objects.filter(reg_number="2021/222222").update(face_embedding=FAKE_FACES["ada-twin"])
+        response = self.accredit(face="ada-twin-again")
+        self.assertContains(response, "did not match")
+        entry = AuditLog.objects.get(action="face_closer_to_other", reg_number="2021/111111")
+        self.assertIn("to 2021/222222", entry.detail)
+        # The real owner of each registration still gets through.
+        self.assertRedirects(self.accredit(), reverse("ballot"))
 
     def test_unregistered_student_cannot_vote(self, _):
         self.assertContains(self.accredit(reg="2021/333333", face="chidi"), "not on the registered voters list")
