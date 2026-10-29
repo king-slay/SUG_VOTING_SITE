@@ -16,8 +16,18 @@ def env_bool(name, default=False):
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o]
+# In development (DEBUG), also accept a Cloudflare quick tunnel, which is how phones
+# reach the laptop over https in a practice run. Production sets both variables.
+ALLOWED_HOSTS = os.environ.get(
+    "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1" + (",.trycloudflare.com" if DEBUG else "")
+).split(",")
+CSRF_TRUSTED_ORIGINS = [
+    o
+    for o in os.environ.get(
+        "DJANGO_CSRF_TRUSTED_ORIGINS", "https://*.trycloudflare.com" if DEBUG else ""
+    ).split(",")
+    if o
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",

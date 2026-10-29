@@ -86,9 +86,7 @@ tunnel (no account): install `cloudflared` (Windows: `winget install --id
 Cloudflare.cloudflared`), then in two terminals:
 
 ```powershell
-# terminal 1 (PowerShell)
-$env:DJANGO_ALLOWED_HOSTS = "localhost,127.0.0.1,.trycloudflare.com"
-$env:DJANGO_CSRF_TRUSTED_ORIGINS = "https://*.trycloudflare.com"
+# terminal 1
 python manage.py runserver 8000
 
 # terminal 2
@@ -97,7 +95,8 @@ cloudflared tunnel --url http://localhost:8000
 
 `cloudflared` prints an `https://<random-words>.trycloudflare.com` address.
 Open that on the phones. The address changes each time `cloudflared` restarts.
-On macOS/Linux use `export NAME=value` instead of `$env:NAME = "value"`.
+While `DJANGO_DEBUG` is on (the default), the site accepts `*.trycloudflare.com`
+addresses without extra settings.
 
 ## Liveness check (anti-spoofing)
 
@@ -119,8 +118,8 @@ conditions; the voter just tries again in better light. Turn it off with
 | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | dev key | Set a long random value in production |
 | `DJANGO_DEBUG` | `true` | Set `false` in production |
-| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated host names |
-| `DJANGO_CSRF_TRUSTED_ORIGINS` | | e.g. `https://vote.example.com` |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` (plus `.trycloudflare.com` while debugging) | Comma-separated host names |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://*.trycloudflare.com` while debugging, else empty | e.g. `https://vote.example.com` |
 | `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_HOST`, `MYSQL_PORT` | | Use MySQL when `MYSQL_DATABASE` is set, otherwise SQLite |
 | `FACE_MODEL` | `Facenet512` | DeepFace model |
 | `FACE_DETECTOR` | `retinaface` | DeepFace face detector (`opencv` is faster but misses more faces) |
