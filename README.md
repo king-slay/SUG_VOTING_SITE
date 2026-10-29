@@ -51,7 +51,9 @@ Open http://127.0.0.1:8000. The committee logs in at `/admin/` and then uses
 `/staff/`.
 
 The first face scan downloads the Facenet512 (95 MB), RetinaFace and liveness
-(MiniFASNet) models to `~/.deepface`, so it is slow once.
+(MiniFASNet) models to `~/.deepface`, so it is slow once. After that,
+`runserver` loads the models in the background as it starts (it prints
+"Face models loaded"), so the first voter after a restart does not wait for them.
 
 **Camera access only works on `localhost` or over `https`.** To test from a
 phone, see *Practice election* below.

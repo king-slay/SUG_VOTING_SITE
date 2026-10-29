@@ -105,6 +105,9 @@
     var preview = null;
     var ready = false;
     var busy = false;
+    // While a message is on hold, the live coach does not replace it.
+    var holdUntil = 0;
+    function hold() { holdUntil = Date.now() + 4000; }
 
     function setState(state) { box.setAttribute("data-state", state); }
     function mark(el, ok) {
@@ -121,7 +124,7 @@
     }
 
     function coach() {
-      if (!ready || preview || busy || document.hidden) return;
+      if (!ready || preview || busy || document.hidden || Date.now() < holdUntil) return;
       // An off-screen muted video may be paused with no frame yet; don't
       // call that "too dark".
       if (video.paused) { Promise.resolve(video.play()).catch(function () {}); return; }
@@ -169,6 +172,7 @@
     }
 
     function tooDark() {
+      hold();
       setState("warn");
       setStatus(status, "The picture is too dark. Move to better light, keep the camera uncovered, and try again.");
     }
@@ -215,21 +219,16 @@
     }
 
     form.addEventListener("submit", function (event) {
-      if (!form.hasAttribute("data-capture-on-submit")) {
-        if (!input.value) {
-          event.preventDefault();
-          setState("warn");
-          setStatus(status, "Please capture your face first.");
-          box.scrollIntoView({ block: "center", behavior: "smooth" });
-          return;
-        }
+      if (input.value && !form.hasAttribute("data-capture-on-submit")) {
         lock();
         return;
       }
-      // Ballot page: take the re-check photo at the moment of submitting.
+      // No photo captured yet, or the ballot page, which always re-checks the face at
+      // the moment of submitting: take the photo now instead of sending the voter back.
       event.preventDefault();
       if (!form.reportValidity()) return;
       if (!ready) {
+        hold();
         setStatus(status, "Waiting for the camera to start...");
         return;
       }

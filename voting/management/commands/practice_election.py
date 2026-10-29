@@ -99,20 +99,11 @@ class Command(BaseCommand):
         ))
 
     def warmup(self, **_):
-        """Download and load the models now, so the first student does not wait minutes."""
-        import numpy as np
-        from deepface import DeepFace
+        """Download the models now, on good internet, rather than during the first scan."""
+        from voting.faces import warm_up
 
         self.stdout.write("Loading face models (the first time this downloads about 250 MB)...")
-        blank = np.zeros((480, 640, 3), dtype=np.uint8)
-        DeepFace.build_model(settings.FACE_MODEL)
-        try:
-            DeepFace.represent(
-                img_path=blank, model_name=settings.FACE_MODEL, detector_backend=settings.FACE_DETECTOR,
-                enforce_detection=False, anti_spoofing=settings.FACE_ANTI_SPOOFING,
-            )
-        except ValueError:
-            pass  # a blank frame may be flagged as a spoof; the models are loaded either way
+        warm_up()
         self.stdout.write(self.style.SUCCESS("Face models ready."))
 
     def _election(self):
