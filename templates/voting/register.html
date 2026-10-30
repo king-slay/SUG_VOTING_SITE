@@ -77,6 +77,9 @@
       <h2>Your face</h2>
       {% include "voting/_camera.html" %}
       <input type="hidden" name="face_image">
+      {# Two more photos a moment apart: the stored face is the average of all three. #}
+      <input type="hidden" name="face_image_extra">
+      <input type="hidden" name="face_image_extra">
       {{ form.face_image.errors }}
       <div class="actions">
         <button type="button" class="btn secondary" data-capture>Capture</button>

@@ -14,12 +14,15 @@ OpenCV and DeepFace.
 2. **Registration.** At `/register/` a student enters their details. They are
    cross-checked against the roll (case and extra spaces are ignored). The
    student adds email and phone and captures their face with the webcam. The
-   face is turned into an embedding (Facenet512) and stored. Every face scan
+   camera takes three photos a moment apart; each is turned into an embedding
+   (Facenet512), and if they agree, their average is stored. Every face scan
    first passes a liveness check (see below). A face that is
    already registered to another reg number is refused, so one person cannot
    register twice. Registration closes while an election is open.
 3. **Election day.** At `/vote/` the student enters their reg number and scans
-   their face (accreditation). If it matches, they get the ballot, choose one
+   their face (accreditation). The face must be close enough to the registered
+   one *and* clearly closer to it than to any other registered student, so a
+   look-alike (e.g. a sibling) is refused. If it matches, they get the ballot, choose one
    candidate per position, and their face is checked **again** when they
    submit. The ballot must be submitted within 10 minutes of accreditation.
 4. **One vote per student** is enforced by a database constraint. The system
@@ -123,7 +126,9 @@ conditions; the voter just tries again in better light. Turn it off with
 | `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_HOST`, `MYSQL_PORT` | | Use MySQL when `MYSQL_DATABASE` is set, otherwise SQLite |
 | `FACE_MODEL` | `Facenet512` | DeepFace model |
 | `FACE_DETECTOR` | `retinaface` | DeepFace face detector (`opencv` is faster but misses more faces) |
-| `FACE_MATCH_THRESHOLD` | `0.30` | Max cosine distance to accept a face match |
+| `FACE_MATCH_THRESHOLD` | `0.25` | Max cosine distance to accept a face match |
+| `FACE_MATCH_MARGIN` | `0.08` | Refuse a scan when another registered face is within this distance of the claimed one (too close to call, e.g. siblings) |
+| `FACE_ENROL_CONSISTENCY` | `0.15` | Registration takes 3 photos and stores their average; refused if any two differ by more than this |
 | `FACE_DUPLICATE_THRESHOLD` | same as `FACE_MATCH_THRESHOLD` | Distance under which a new registration counts as an already-registered face |
 | `FACE_ANTI_SPOOFING` | `true` | Liveness check that rejects photos and screens held up to the camera |
 | `VOTE_SESSION_MINUTES` | `10` | Time allowed between accreditation and submitting the ballot |

@@ -49,6 +49,23 @@
     });
   }
 
+  // Several photos a moment apart (registration stores their average), or one.
+  function snapshots(box, video, count) {
+    return snapshot(box, video).then(function (first) {
+      var urls = [first];
+      function next() {
+        if (urls.length >= count) return urls;
+        return new Promise(function (resolve) { setTimeout(resolve, 350); }).then(function () {
+          var shot = grab(video);
+          if (shot.brightness < 15) throw new Error("dark");
+          urls.push(shot.url);
+          return next();
+        });
+      }
+      return next();
+    });
+  }
+
   // Average brightness (0-255) of the middle of the frame, where the face should be.
   var probe = document.createElement("canvas");
   probe.width = 48; probe.height = 36;
@@ -93,6 +110,7 @@
     var status = form.querySelector("[data-camera-status]");
     var captureBtn = form.querySelector("[data-capture]");
     var input = form.querySelector("input[name=face_image]");
+    var extras = form.querySelectorAll("input[name=face_image_extra]");
     var submitBtn = form.querySelector("[type=submit]");
     var checks = {
       light: form.querySelector('[data-check="light"]'),
@@ -166,9 +184,18 @@
         if (submitBtn) submitBtn.disabled = true;
       });
 
+    function takePhotos() {
+      return snapshots(box, video, 1 + extras.length).then(function (urls) {
+        input.value = urls[0];
+        extras.forEach(function (el, i) { el.value = urls[i + 1]; });
+        return urls[0];
+      });
+    }
+
     function clearPreview() {
       if (preview) { preview.remove(); preview = null; }
       input.value = "";
+      extras.forEach(function (el) { el.value = ""; });
     }
 
     function tooDark() {
@@ -194,9 +221,8 @@
           return;
         }
         busy = true;
-        snapshot(box, video).then(function (url) {
+        takePhotos().then(function (url) {
           busy = false;
-          input.value = url;
           preview = document.createElement("img");
           preview.src = url;
           preview.alt = "Captured photo";
@@ -233,8 +259,7 @@
         return;
       }
       lock();
-      snapshot(box, video).then(function (url) {
-        input.value = url;
+      takePhotos().then(function () {
         flash();
         form.submit();
       }, function () {

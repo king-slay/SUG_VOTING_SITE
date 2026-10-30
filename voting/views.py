@@ -37,8 +37,10 @@ def register(request):
     form = RegistrationForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
         voter = form.cleaned_data["voter"]
+        # The camera sends several photos taken a moment apart; older pages send one.
+        images = ([form.cleaned_data["face_image"]] + [i for i in request.POST.getlist("face_image_extra") if i])[:5]
         try:
-            embedding = faces.get_embedding(form.cleaned_data["face_image"])
+            embedding, spread = faces.combine([faces.get_embedding(image) for image in images])
             others = Voter.objects.exclude(pk=voter.pk).exclude(face_embedding=None)
             duplicate, nearest = faces.find_duplicate(embedding, others)
         except faces.SpoofError as exc:
@@ -68,7 +70,9 @@ def register(request):
                 voter.save()
                 # Distance to the most similar face already registered: shows how
                 # close look-alikes (e.g. siblings) come to the duplicate threshold.
-                detail = f"nearest other face distance {nearest:.3f}" if nearest is not None else ""
+                detail = f"{len(images)} photo(s), spread {spread:.3f}"
+                if nearest is not None:
+                    detail += f", nearest other face distance {nearest:.3f}"
                 log(request, "registered", detail, voter.reg_number)
                 return render(request, "voting/register_done.html", {"voter": voter})
 
@@ -114,9 +118,9 @@ def _check_face(request, voter, data_url):
         log(request, "face_mismatch", f"distance {dist:.3f}", voter.reg_number)
         return "Your face did not match the registered face for this registration number. Please try again.", dist
     # A look-alike (e.g. a sibling) can come under the threshold for someone else's
-    # registration, but their own registered face is still the closer one.
+    # registration. Refuse unless the claimed voter is clearly the closest face.
     other, other_dist = faces.nearest_face(embedding, Voter.objects.exclude(pk=voter.pk).exclude(face_embedding=None))
-    if other is not None and other_dist <= dist:
+    if other is not None and other_dist < dist + settings.FACE_MATCH_MARGIN:
         log(
             request, "face_closer_to_other",
             f"distance {dist:.3f}, but {other_dist:.3f} to {other.reg_number}", voter.reg_number,

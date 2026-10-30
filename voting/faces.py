@@ -97,6 +97,26 @@ def distance(a, b):
     return float(1 - np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
 
 
+def combine(embeddings):
+    """Average several photos of one face into one stored embedding.
+
+    Returns (embedding, spread), where spread is the largest distance between any
+    two of the photos. Raises FaceError when they disagree too much to trust.
+    """
+    spread = max(
+        (distance(a, b) for i, a in enumerate(embeddings) for b in embeddings[i + 1:]),
+        default=0.0,
+    )
+    if spread > settings.FACE_ENROL_CONSISTENCY:
+        raise FaceError(
+            "Your photos did not match each other well enough. Hold the phone steady at eye level, "
+            "face a light, keep your whole face in the oval, and try again."
+        )
+    unit = [np.asarray(e, dtype=float) / np.linalg.norm(e) for e in embeddings]
+    mean = np.mean(unit, axis=0)
+    return (mean / np.linalg.norm(mean)).tolist(), spread
+
+
 def matches(stored_embedding, new_embedding):
     """Return (is_match, distance)."""
     d = distance(stored_embedding, new_embedding)

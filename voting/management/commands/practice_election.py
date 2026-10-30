@@ -48,7 +48,7 @@ AUDIT_ACTIONS = [
     ("accredited", "Accreditations (face matched)"),
     ("vote_cast", "Ballots cast (face matched again)"),
     ("face_mismatch", "Face did not match"),
-    ("face_closer_to_other", "Rejected: face closer to another registered student"),
+    ("face_closer_to_other", "Rejected: too close to another registered student"),
     ("spoof_rejected", "Liveness check rejected (photo/screen)"),
     ("face_not_read", "No face found / photo unreadable"),
 ]
