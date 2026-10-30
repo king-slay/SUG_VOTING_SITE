@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Committee sign in | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+<div class="narrow">
+  <div class="page-head">
+    <h1>Electoral committee</h1>
+    <p class="lead">Sign in with your committee account to manage the voter roll, elections and results.</p>
+  </div>
+  <form method="post" class="panel">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert error" role="alert">{% for e in form.non_field_errors %}{{ e }} {% endfor %}</div>{% endif %}
+    <div class="field">
+      <label for="id_username">Username</label>
+      <input type="text" name="username" id="id_username" autocomplete="username" autocapitalize="none" value="{{ form.username.value|default:'' }}" required autofocus>
+    </div>
+    <div class="field">
+      <label for="id_password">Password</label>
+      <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+    </div>
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="actions"><button type="submit" class="btn block">Sign in</button></div>
+  </form>
+  <p class="small muted">Voting? You don't need an account. <a href="{% url 'vote_start' %}">Go to the ballot</a>.</p>
+</div>
+{% endblock %}

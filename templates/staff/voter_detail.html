@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ voter.full_name }} | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+{% include "staff/_nav.html" %}
+<p class="crumb"><a href="{% url 'staff_roll' %}">&larr; Voter roll</a></p>
+<div class="title-row">
+  <h1>{{ voter.full_name }}</h1>
+  {% if voter.is_registered %}<span class="pill open">Registered with face</span>{% else %}<span class="pill">Not registered</span>{% endif %}
+</div>
+
+<div class="staff-grid">
+  <section class="panel">
+    <h2>Details</h2>
+    <dl class="facts">
+      <dt>Reg number</dt><dd class="tnum">{{ voter.reg_number }}</dd>
+      <dt>Faculty</dt><dd>{{ voter.faculty }}</dd>
+      <dt>Department</dt><dd>{{ voter.department }}</dd>
+      <dt>Level</dt><dd>{{ voter.level }}</dd>
+      <dt>Email</dt><dd>{{ voter.email|default:"–" }}</dd>
+      <dt>Phone</dt><dd>{{ voter.phone|default:"–" }}</dd>
+      <dt>Registered</dt><dd>{{ voter.registered_at|date:"j M Y, H:i"|default:"–" }}</dd>
+      <dt>Voted in</dt><dd>{% for p in voted_in %}{{ p.election.title }}{% if not forloop.last %}, {% endif %}{% empty %}–{% endfor %}</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <h2>Registered face</h2>
+    {% if voter.face_photo %}<img class="face-photo" src="{{ voter.face_photo.url }}" alt="Face photo registered for {{ voter.full_name }}">
+    {% else %}<p class="muted">No face registered yet.</p>{% endif %}
+    {% if voter.is_registered %}
+      <form method="post" action="{% url 'staff_voter_reset_face' voter.pk %}" data-confirm="Clear {{ voter.full_name }}'s face so they can register again?">
+        {% csrf_token %}
+        <p class="small">Clear the face if the wrong person registered with this reg number, or the photo was poor. The student then registers again{% if not registration_open %} once voting closes{% endif %}.</p>
+        <button type="submit" class="btn secondary sm">Clear face registration</button>
+      </form>
+    {% endif %}
+  </section>
+</div>
+
+<section class="panel">
+  <h2>Recent activity</h2>
+  {% if history %}
+  <div class="table-wrap">
+    <table class="log">
+      <thead><tr><th>Time</th><th>Action</th><th>Detail</th></tr></thead>
+      <tbody>{% for e in history %}<tr><td class="nowrap tnum">{{ e.created_at|date:"Y-m-d H:i" }}</td><td><span class="action">{{ e.action }}</span></td><td>{{ e.detail }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  <p class="small"><a href="{% url 'staff_audit' %}?q={{ voter.reg_number|urlencode }}">See everything in the audit log</a></p>
+  {% else %}<p class="muted">Nothing logged for this student yet.</p>{% endif %}
+</section>
+
+{% if not voted_in %}
+<form method="post" action="{% url 'staff_voter_remove' voter.pk %}" class="panel" data-confirm="Remove {{ voter.full_name }} from the voter roll?">
+  {% csrf_token %}
+  <h2>Remove from roll</h2>
+  <p class="small">Use this if the student is not eligible. Uploading a roll that includes them again adds them back.</p>
+  <button type="submit" class="btn danger sm">Remove student</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block scripts %}{% include "staff/_confirm.html" %}{% endblock %}

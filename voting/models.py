@@ -56,6 +56,26 @@ class Election(models.Model):
     def current(cls):
         return cls.objects.filter(status=cls.OPEN).first()
 
+    @property
+    def is_editable(self):
+        """Positions and candidates can only change before voting opens."""
+        return self.status == self.DRAFT
+
+    def open_problems(self):
+        """Reasons voting cannot open yet; empty when it can."""
+        if self.status != self.DRAFT:
+            return ["Only a draft election can be opened."]
+        problems = []
+        if Election.objects.filter(status=self.OPEN).exclude(pk=self.pk).exists():
+            problems.append("Another election is already open. Close it first.")
+        positions = list(self.positions.all())
+        if not positions:
+            problems.append("Add at least one position.")
+        empty = [p.title for p in positions if not p.candidates.exists()]
+        if empty:
+            problems.append(f"Add a candidate to: {', '.join(empty)}.")
+        return problems
+
 
 class Position(models.Model):
     election = models.ForeignKey(Election, on_delete=models.CASCADE, related_name="positions")
