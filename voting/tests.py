@@ -3,6 +3,7 @@ test is a short name, and each name maps to a fixed embedding, so the tests run
 without a camera or DeepFace models."""
 
 import base64
+import tempfile
 from datetime import timedelta
 from unittest import mock
 
@@ -96,7 +97,7 @@ class RollImportTests(TestCase):
 
 
 @mock.patch("voting.faces.get_embedding", side_effect=fake_embedding)
-@override_settings(MEDIA_ROOT="/tmp/unnvote-test-media")
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="unnvote-test-media-"))
 class RegistrationTests(TestCase):
     def setUp(self):
         import_roll(csv_file(ROLL))
@@ -313,7 +314,14 @@ class StaffTests(TestCase):
     def test_staff_pages_require_login(self):
         response = self.client.get(reverse("staff_dashboard"))
         self.assertEqual(response.status_code, 302)
-        self.assertIn("/admin/login/", response["Location"])
+        self.assertIn(reverse("staff_login"), response["Location"])
+
+    def test_committee_login_page_refuses_students(self):
+        User.objects.create_user("student", password="pass12345")
+        response = self.client.post(reverse("staff_login"), {"username": "student", "password": "pass12345"})
+        self.assertContains(response, "staff account")
+        response = self.client.post(reverse("staff_login"), {"username": "committee", "password": "pass12345"})
+        self.assertRedirects(response, reverse("staff_dashboard"))
 
     def test_roll_upload_view(self):
         self.client.force_login(self.admin)
@@ -340,6 +348,179 @@ class StaffTests(TestCase):
         election.results_public = True
         election.save()
         self.assertEqual(self.client.get(reverse("public_results", args=[election.pk])).status_code, 200)
+
+
+def xlsx_file(rows):
+    import io
+
+    from openpyxl import Workbook
+
+    book = Workbook()
+    for row in rows:
+        book.active.append(row)
+    buffer = io.BytesIO()
+    book.save(buffer)
+    return SimpleUploadedFile("roll.xlsx", buffer.getvalue())
+
+
+class ExcelRollTests(TestCase):
+    def test_imports_xlsx_with_numbers_and_extra_columns(self):
+        result = import_roll(xlsx_file([
+            ["Full Name", "Reg Number", "Faculty", "Department", "Level", "Gender"],
+            ["Ada Obi", "2021/111111", "Physical Sciences", "Computer Science", 200, "F"],
+            [None, None, None, None, None, None],
+        ]))
+        self.assertTrue(result.ok, result.errors)
+        self.assertEqual(Voter.objects.get().level, "200")
+
+    def test_xlsx_bad_row_rejects_file(self):
+        result = import_roll(xlsx_file([
+            ["full_name", "reg_number", "faculty", "department", "level"],
+            ["Ada Obi", "2021/111111", "", "Computer Science", 200],
+        ]))
+        self.assertEqual(result.errors, ["Row 2: empty faculty."])
+
+    def test_broken_xlsx(self):
+        result = import_roll(SimpleUploadedFile("roll.xlsx", b"not a zip"))
+        self.assertIn("could not be read", result.errors[0])
+
+    def test_old_xls_refused_with_advice(self):
+        user = User.objects.create_superuser("committee", "c@example.com", "pass12345")
+        self.client.force_login(user)
+        response = self.client.post(reverse("staff_roll_upload"), {"file": SimpleUploadedFile("roll.xls", b"x")})
+        self.assertContains(response, "Save As")
+
+
+class RollManagementTests(TestCase):
+    def setUp(self):
+        self.client.force_login(User.objects.create_superuser("committee", "c@example.com", "pass12345"))
+        import_roll(csv_file(ROLL))
+        self.ada = Voter.objects.get(reg_number="2021/111111")
+        self.ada.face_embedding = [1.0, 0.0, 0.0, 0.0]
+        self.ada.registered_at = timezone.now()
+        self.ada.save()
+
+    def test_list_filters(self):
+        url = reverse("staff_roll")
+        self.assertContains(self.client.get(url), "Chidi Eze")
+        response = self.client.get(url, {"status": "registered"})
+        self.assertContains(response, "Ada Obi")
+        self.assertNotContains(response, "Chidi Eze")
+        response = self.client.get(url, {"faculty": "Engineering", "q": "chidi"})
+        self.assertContains(response, "Chidi Eze")
+        self.assertNotContains(response, "Bola Ade")
+
+    def test_export_follows_filters(self):
+        response = self.client.get(reverse("staff_roll_export"), {"status": "not_registered"})
+        text = response.content.decode("utf-8-sig")
+        self.assertIn("Bola Ade", text)
+        self.assertNotIn("Ada Obi", text)
+
+    def test_reset_face(self):
+        self.client.post(reverse("staff_voter_reset_face", args=[self.ada.pk]))
+        self.ada.refresh_from_db()
+        self.assertFalse(self.ada.is_registered)
+        self.assertTrue(AuditLog.objects.filter(action="registration_reset", reg_number=self.ada.reg_number).exists())
+
+    def test_remove_only_if_not_voted(self):
+        election = Election.objects.create(title="SUG", status=Election.CLOSED)
+        Participation.objects.create(election=election, voter=self.ada)
+        self.client.post(reverse("staff_voter_remove", args=[self.ada.pk]))
+        self.assertTrue(Voter.objects.filter(pk=self.ada.pk).exists())
+        bola = Voter.objects.get(reg_number="2021/222222")
+        self.assertRedirects(self.client.post(reverse("staff_voter_remove", args=[bola.pk])), reverse("staff_roll"))
+        self.assertFalse(Voter.objects.filter(pk=bola.pk).exists())
+
+    def test_detail_page(self):
+        self.assertContains(self.client.get(reverse("staff_voter", args=[self.ada.pk])), "Clear face registration")
+
+    def test_get_does_not_change_anything(self):
+        self.assertEqual(self.client.get(reverse("staff_voter_remove", args=[self.ada.pk])).status_code, 405)
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="unnvote-test-media-"))
+class ElectionManagementTests(TestCase):
+    def setUp(self):
+        self.client.force_login(User.objects.create_superuser("committee", "c@example.com", "pass12345"))
+
+    def create_ballot(self):
+        self.client.post(reverse("staff_election_new"), {"title": "SUG 2026"})
+        election = Election.objects.get(title="SUG 2026")
+        self.client.post(reverse("staff_position_new", args=[election.pk]), {"title": "President", "order": 1})
+        position = election.positions.get()
+        return election, position
+
+    def test_build_ballot_and_run_election(self):
+        election, position = self.create_ballot()
+        self.client.post(reverse("staff_election_status", args=[election.pk]), {"action": "open"})
+        election.refresh_from_db()
+        self.assertEqual(election.status, Election.DRAFT)  # no candidates yet
+
+        gif = b"GIF89a\x01\x00\x01\x00\x00\x00\x00;"
+        self.client.post(reverse("staff_candidate_new", args=[position.pk]), {
+            "name": "Ngozi Okafor", "department": "Law", "manifesto": "Water in every hostel.",
+            "photo": SimpleUploadedFile("ngozi.png", gif, content_type="image/png"),
+        })
+        candidate = position.candidates.get()
+        self.assertTrue(candidate.photo.name.startswith("candidates/"))
+        self.assertContains(self.client.get(reverse("candidates")), "Ngozi Okafor")
+
+        self.client.post(reverse("staff_election_status", args=[election.pk]), {"action": "open"})
+        election.refresh_from_db()
+        self.assertEqual(election.status, Election.OPEN)
+
+        # The ballot is frozen while voting is open.
+        self.client.post(reverse("staff_candidate_delete", args=[candidate.pk]))
+        self.client.post(reverse("staff_position_new", args=[election.pk]), {"title": "Treasurer", "order": 2})
+        self.assertTrue(Candidate.objects.filter(pk=candidate.pk).exists())
+        self.assertEqual(election.positions.count(), 1)
+
+        self.client.post(reverse("staff_election_status", args=[election.pk]), {"action": "publish"})
+        election.refresh_from_db()
+        self.assertFalse(election.results_public)  # not until voting closes
+
+        self.client.post(reverse("staff_election_status", args=[election.pk]), {"action": "close"})
+        self.client.post(reverse("staff_election_status", args=[election.pk]), {"action": "publish"})
+        election.refresh_from_db()
+        self.assertEqual((election.status, election.results_public), (Election.CLOSED, True))
+        actions = set(AuditLog.objects.values_list("action", flat=True))
+        self.assertTrue({"election_created", "election_opened", "election_closed", "results_published"} <= actions)
+
+    def test_only_one_open_election(self):
+        Election.objects.create(title="Old", status=Election.OPEN)
+        election, position = self.create_ballot()
+        Candidate.objects.create(position=position, name="A")
+        response = self.client.post(reverse("staff_election_status", args=[election.pk]), {"action": "open"}, follow=True)
+        self.assertContains(response, "Another election is already open")
+
+    def test_duplicate_position_refused(self):
+        election, _ = self.create_ballot()
+        response = self.client.post(reverse("staff_position_new", args=[election.pk]), {"title": "president", "order": 2})
+        self.assertContains(response, "already has that position")
+
+    def test_candidate_photo_type_checked(self):
+        _, position = self.create_ballot()
+        response = self.client.post(reverse("staff_candidate_new", args=[position.pk]), {
+            "name": "A", "photo": SimpleUploadedFile("cv.pdf", b"%PDF", content_type="application/pdf"),
+        })
+        self.assertContains(response, "JPG, PNG or WebP")
+
+    def test_delete_draft_only(self):
+        election, _ = self.create_ballot()
+        self.client.post(reverse("staff_election_delete", args=[election.pk]))
+        self.assertFalse(Election.objects.exists())
+        closed = Election.objects.create(title="Done", status=Election.CLOSED)
+        self.client.post(reverse("staff_election_delete", args=[closed.pk]))
+        self.assertTrue(Election.objects.filter(pk=closed.pk).exists())
+
+    def test_results_export(self):
+        election = Election.objects.create(title="SUG 2026", status=Election.CLOSED)
+        position = Position.objects.create(election=election, title="President")
+        a = Candidate.objects.create(position=position, name="Ada")
+        Vote.objects.create(election=election, position=position, candidate=a)
+        response = self.client.get(reverse("staff_results_export", args=[election.pk]))
+        self.assertEqual(response["Content-Disposition"], 'attachment; filename="results-sug-2026.csv"')
+        self.assertIn("President,Ada,,1,100.0,yes", response.content.decode("utf-8-sig"))
 
 
 class FaceMathTests(TestCase):

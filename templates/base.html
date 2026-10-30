@@ -24,7 +24,7 @@
         </svg>
         <span>UNN SUG <span class="brand-sub">E-Voting</span></span>
       </a>
-      <nav class="nav" aria-label="Main">
+      <nav class="nav{% if user.is_staff %} has-staff{% endif %}" aria-label="Main">
         {% with name=request.resolver_match.url_name %}
         <a href="{% url 'candidates' %}"{% if name == 'candidates' %} aria-current="page"{% endif %}>Candidates</a>
         <a href="{% url 'register' %}"{% if name == 'register' %} aria-current="page"{% endif %}>Register</a>

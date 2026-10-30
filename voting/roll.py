@@ -1,6 +1,7 @@
-"""Voter roll CSV import.
+"""Voter roll import, from a CSV or an Excel (.xlsx) sheet.
 
-The admin uploads a CSV with exactly these headers (any order, any case):
+The admin uploads a file whose first row has these headers (any order, any case;
+extra columns are ignored):
 
     full_name, reg_number, faculty, department, level
 
@@ -10,6 +11,7 @@ registration is kept. New students are added.
 
 import csv
 import io
+import zipfile
 from dataclasses import dataclass, field
 
 from django.db import transaction
@@ -39,27 +41,56 @@ class ImportResult:
         return not self.errors
 
 
-def import_roll(uploaded_file):
-    """Validate the whole file first; write nothing if any row is bad."""
-    result = ImportResult()
+def _cell(value):
+    """Excel stores 200 as 200.0; turn cells back into the text the admin typed."""
+    if value is None:
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        value = int(value)
+    return str(value)
+
+
+def read_csv(uploaded_file):
     try:
         text = uploaded_file.read().decode("utf-8-sig")
     except UnicodeDecodeError:
-        result.errors.append("The file is not UTF-8 text. Save it from Excel as 'CSV UTF-8'.")
+        raise ValueError("The file is not UTF-8 text. Save it from Excel as 'CSV UTF-8', or upload the .xlsx file.")
+    rows = list(csv.reader(io.StringIO(text)))
+    return (rows[0] if rows else []), rows[1:]
+
+
+def read_xlsx(uploaded_file):
+    from openpyxl import load_workbook
+
+    try:
+        sheet = load_workbook(uploaded_file, read_only=True, data_only=True).worksheets[0]
+    except (zipfile.BadZipFile, KeyError, OSError, IndexError):
+        raise ValueError("This Excel file could not be read. Open it in Excel and save it again as .xlsx.")
+    rows = [[_cell(v) for v in row] for row in sheet.iter_rows(values_only=True)]
+    return (rows[0] if rows else []), rows[1:]
+
+
+def import_roll(uploaded_file):
+    """Validate the whole file first; write nothing if any row is bad."""
+    result = ImportResult()
+    reader = read_xlsx if uploaded_file.name.lower().endswith(".xlsx") else read_csv
+    try:
+        header_row, data_rows = reader(uploaded_file)
+    except ValueError as exc:
+        result.errors.append(str(exc))
         return result
 
-    reader = csv.DictReader(io.StringIO(text))
-    headers = [normalize(h).replace(" ", "_") for h in (reader.fieldnames or [])]
+    headers = [normalize(h).replace(" ", "_") for h in header_row]
     missing = [h for h in REQUIRED_HEADERS if h not in headers]
     if missing:
         result.errors.append(
             f"Missing column(s): {', '.join(missing)}. Required headers: {', '.join(REQUIRED_HEADERS)}."
         )
         return result
-    reader.fieldnames = headers
 
     rows, seen = [], {}
-    for line_no, raw in enumerate(reader, start=2):
+    for line_no, values in enumerate(data_rows, start=2):
+        raw = dict(zip(headers, values))
         row = {h: " ".join((raw.get(h) or "").split()) for h in REQUIRED_HEADERS}
         if not any(row.values()):
             continue

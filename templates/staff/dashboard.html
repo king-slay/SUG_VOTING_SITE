@@ -9,16 +9,16 @@
 </div>
 
 <div class="kpis">
-  <div class="kpi"><span class="label">Students on voter roll</span><span class="value">{{ roll_count }}</span></div>
-  <div class="kpi"><span class="label">Registered with face</span><span class="value">{{ registered_count }}</span></div>
+  <a class="kpi" href="{% url 'staff_roll' %}"><span class="label">Students on voter roll</span><span class="value">{{ roll_count }}</span></a>
+  <a class="kpi" href="{% url 'staff_roll' %}?status=registered"><span class="label">Registered with face</span><span class="value">{{ registered_count }}</span></a>
   {% if turnout %}
   <div class="kpi"><span class="label">Voted in {{ election.title }}</span><span class="value">{{ turnout.voted }} <span class="unit">{{ turnout.percent }}% turnout</span></span></div>
   {% endif %}
 </div>
 
 <div class="staff-grid">
-  <section class="panel">
-    <h2>Elections</h2>
+  <section class="panel" id="elections">
+    <div class="title-row section-head"><h2>Elections</h2><a class="btn sm" href="{% url 'staff_election_new' %}">New election</a></div>
     {% if elections %}
     <div class="table-wrap">
       <table>
@@ -26,27 +26,27 @@
         <tbody>
         {% for e in elections %}
           <tr>
-            <td>{{ e.title }}</td>
-            <td><span class="pill {{ e.status }}">{{ e.get_status_display }}</span></td>
-            <td class="links"><a href="{% url 'staff_results' e.pk %}">Results</a> <a href="{% url 'admin:voting_election_change' e.pk %}">Edit</a></td>
+            <td><a href="{% url 'staff_election' e.pk %}">{{ e.title }}</a></td>
+            <td><span class="pill {{ e.status }}">{{ e.get_status_display }}</span>{% if e.results_public %} <span class="pill">Results public</span>{% endif %}</td>
+            <td class="links"><a href="{% url 'staff_election' e.pk %}">{% if e.status == "draft" %}Set up{% else %}Manage{% endif %}</a>{% if e.status != "draft" %} <a href="{% url 'staff_results' e.pk %}">Results</a>{% endif %}</td>
           </tr>
         {% endfor %}
         </tbody>
       </table>
     </div>
     {% else %}
-      <p>No elections yet. <a href="{% url 'admin:voting_election_add' %}">Create one</a>, add positions, then add candidates to each position.</p>
+      <p>No elections yet. Create one, add its positions, then add candidates to each position.</p>
     {% endif %}
   </section>
 
   <section class="panel">
     <h2>Running an election</h2>
     <ol class="steps">
-      <li>Upload the voter roll CSV.</li>
+      <li><a href="{% url 'staff_roll_upload' %}">Upload the voter roll</a> as a CSV or Excel sheet.</li>
       <li>Students register with their details and face. Registration closes automatically once voting opens.</li>
-      <li>Create the election, its positions and candidates in the admin.</li>
-      <li>On election day, select the election in the admin and run <em>Open voting</em>. Run <em>Close voting</em> when polls close.</li>
-      <li>Watch live results here; tick <em>Results public</em> after closing to publish them.</li>
+      <li>Create the election, then add its positions and the candidates for each.</li>
+      <li>On election day, press <em>Open voting</em> on the election's page, and <em>Close voting</em> when polls close.</li>
+      <li>Watch live results, then press <em>Publish results</em> to show them to students.</li>
     </ol>
   </section>
 </div>
