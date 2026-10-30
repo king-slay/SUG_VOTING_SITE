@@ -49,6 +49,23 @@
     });
   }
 
+  // Several photos a moment apart (registration stores their average), or one.
+  function snapshots(box, video, count) {
+    return snapshot(box, video).then(function (first) {
+      var urls = [first];
+      function next() {
+        if (urls.length >= count) return urls;
+        return new Promise(function (resolve) { setTimeout(resolve, 350); }).then(function () {
+          var shot = grab(video);
+          if (shot.brightness < 15) throw new Error("dark");
+          urls.push(shot.url);
+          return next();
+        });
+      }
+      return next();
+    });
+  }
+
   // Average brightness (0-255) of the middle of the frame, where the face should be.
   var probe = document.createElement("canvas");
   probe.width = 48; probe.height = 36;
@@ -93,6 +110,7 @@
     var status = form.querySelector("[data-camera-status]");
     var captureBtn = form.querySelector("[data-capture]");
     var input = form.querySelector("input[name=face_image]");
+    var extras = form.querySelectorAll("input[name=face_image_extra]");
     var submitBtn = form.querySelector("[type=submit]");
     var checks = {
       light: form.querySelector('[data-check="light"]'),
@@ -105,6 +123,9 @@
     var preview = null;
     var ready = false;
     var busy = false;
+    // While a message is on hold, the live coach does not replace it.
+    var holdUntil = 0;
+    function hold() { holdUntil = Date.now() + 4000; }
 
     function setState(state) { box.setAttribute("data-state", state); }
     function mark(el, ok) {
@@ -121,7 +142,7 @@
     }
 
     function coach() {
-      if (!ready || preview || busy || document.hidden) return;
+      if (!ready || preview || busy || document.hidden || Date.now() < holdUntil) return;
       // An off-screen muted video may be paused with no frame yet; don't
       // call that "too dark".
       if (video.paused) { Promise.resolve(video.play()).catch(function () {}); return; }
@@ -163,12 +184,22 @@
         if (submitBtn) submitBtn.disabled = true;
       });
 
+    function takePhotos() {
+      return snapshots(box, video, 1 + extras.length).then(function (urls) {
+        input.value = urls[0];
+        extras.forEach(function (el, i) { el.value = urls[i + 1]; });
+        return urls[0];
+      });
+    }
+
     function clearPreview() {
       if (preview) { preview.remove(); preview = null; }
       input.value = "";
+      extras.forEach(function (el) { el.value = ""; });
     }
 
     function tooDark() {
+      hold();
       setState("warn");
       setStatus(status, "The picture is too dark. Move to better light, keep the camera uncovered, and try again.");
     }
@@ -190,9 +221,8 @@
           return;
         }
         busy = true;
-        snapshot(box, video).then(function (url) {
+        takePhotos().then(function (url) {
           busy = false;
-          input.value = url;
           preview = document.createElement("img");
           preview.src = url;
           preview.alt = "Captured photo";
@@ -215,27 +245,21 @@
     }
 
     form.addEventListener("submit", function (event) {
-      if (!form.hasAttribute("data-capture-on-submit")) {
-        if (!input.value) {
-          event.preventDefault();
-          setState("warn");
-          setStatus(status, "Please capture your face first.");
-          box.scrollIntoView({ block: "center", behavior: "smooth" });
-          return;
-        }
+      if (input.value && !form.hasAttribute("data-capture-on-submit")) {
         lock();
         return;
       }
-      // Ballot page: take the re-check photo at the moment of submitting.
+      // No photo captured yet, or the ballot page, which always re-checks the face at
+      // the moment of submitting: take the photo now instead of sending the voter back.
       event.preventDefault();
       if (!form.reportValidity()) return;
       if (!ready) {
+        hold();
         setStatus(status, "Waiting for the camera to start...");
         return;
       }
       lock();
-      snapshot(box, video).then(function (url) {
-        input.value = url;
+      takePhotos().then(function () {
         flash();
         form.submit();
       }, function () {

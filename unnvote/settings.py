@@ -16,8 +16,18 @@ def env_bool(name, default=False):
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-only-insecure-key-change-me")
 DEBUG = env_bool("DJANGO_DEBUG", True)
-ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o]
+# In development (DEBUG), also accept a Cloudflare quick tunnel, which is how phones
+# reach the laptop over https in a practice run. Production sets both variables.
+ALLOWED_HOSTS = os.environ.get(
+    "DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1" + (",.trycloudflare.com" if DEBUG else "")
+).split(",")
+CSRF_TRUSTED_ORIGINS = [
+    o
+    for o in os.environ.get(
+        "DJANGO_CSRF_TRUSTED_ORIGINS", "https://*.trycloudflare.com" if DEBUG else ""
+    ).split(",")
+    if o
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -109,12 +119,23 @@ CSRF_COOKIE_SECURE = not DEBUG
 # Face verification. Facenet512 + cosine distance: lower distance = more alike.
 FACE_MODEL = os.environ.get("FACE_MODEL", "Facenet512")
 FACE_DETECTOR = os.environ.get("FACE_DETECTOR", "retinaface")
-FACE_MATCH_THRESHOLD = float(os.environ.get("FACE_MATCH_THRESHOLD", "0.30"))
+# Max distance to accept a face. DeepFace suggests 0.30 for Facenet512, but in the
+# practice run a sibling posing as his brother scored 0.17-0.34 while real owners
+# with a good registration scored 0.05-0.14.
+FACE_MATCH_THRESHOLD = float(os.environ.get("FACE_MATCH_THRESHOLD", "0.25"))
+# A face must also be clearly closer to the claimed voter than to anyone else
+# registered: if another voter's face is within this margin, the scan is refused
+# as too close to call (e.g. siblings), rather than guessed.
+FACE_MATCH_MARGIN = float(os.environ.get("FACE_MATCH_MARGIN", "0.08"))
 # Threshold for refusing a registration because the face already belongs to
 # another registered voter (one person, one registration). It equals the match
 # threshold: a face is a duplicate exactly when it would pass as that voter on
 # election day. A looser value blocked real siblings in the practice run.
 FACE_DUPLICATE_THRESHOLD = float(os.environ.get("FACE_DUPLICATE_THRESHOLD", str(FACE_MATCH_THRESHOLD)))
+# Registration takes several photos and stores their average. If any two differ by
+# more than this (blur, movement, a face half out of view), the registration is
+# refused so no student is stored with a weak face record.
+FACE_ENROL_CONSISTENCY = float(os.environ.get("FACE_ENROL_CONSISTENCY", "0.15"))
 # DeepFace's anti-spoofing (liveness) check: rejects photos and screens held up to
 # the camera. Runs on TensorFlow. Set to false only for local debugging.
 FACE_ANTI_SPOOFING = env_bool("FACE_ANTI_SPOOFING", True)

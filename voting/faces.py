@@ -76,9 +76,45 @@ def get_embedding(data_url):
     return faces[0]["embedding"]
 
 
+def warm_up():
+    """Load the detector, recognition and liveness models, so the first voter does not wait for them."""
+    from deepface import DeepFace
+
+    started = time.monotonic()
+    blank = np.zeros((480, 640, 3), dtype=np.uint8)
+    try:
+        DeepFace.represent(
+            img_path=blank, model_name=settings.FACE_MODEL, detector_backend=settings.FACE_DETECTOR,
+            enforce_detection=False, anti_spoofing=settings.FACE_ANTI_SPOOFING,
+        )
+    except ValueError:
+        pass  # a blank frame may be flagged as a spoof; the models are loaded either way
+    logger.info("Face models loaded in %.1f s", time.monotonic() - started)
+
+
 def distance(a, b):
     a, b = np.asarray(a, dtype=float), np.asarray(b, dtype=float)
     return float(1 - np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+
+
+def combine(embeddings):
+    """Average several photos of one face into one stored embedding.
+
+    Returns (embedding, spread), where spread is the largest distance between any
+    two of the photos. Raises FaceError when they disagree too much to trust.
+    """
+    spread = max(
+        (distance(a, b) for i, a in enumerate(embeddings) for b in embeddings[i + 1:]),
+        default=0.0,
+    )
+    if spread > settings.FACE_ENROL_CONSISTENCY:
+        raise FaceError(
+            "Your photos did not match each other well enough. Hold the phone steady at eye level, "
+            "face a light, keep your whole face in the oval, and try again."
+        )
+    unit = [np.asarray(e, dtype=float) / np.linalg.norm(e) for e in embeddings]
+    mean = np.mean(unit, axis=0)
+    return (mean / np.linalg.norm(mean)).tolist(), spread
 
 
 def matches(stored_embedding, new_embedding):

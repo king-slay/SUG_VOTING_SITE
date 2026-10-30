@@ -22,6 +22,9 @@ FAKE_FACES = {
     "ada-sibling": [0.67, 0.0, 0.0, 0.742],  # look-alike: distance 0.33 from ada
     "ada-twin": [0.8, 0.0, 0.0, 0.6],  # registered look-alike: distance 0.20 from ada
     "ada-twin-again": [0.85, 0.0, 0.0, 0.53],  # the twin on election day: 0.15 from ada, 0.004 from own face
+    "ada-ambiguous": [0.95, 0.0, 0.0, 0.31],  # 0.049 from ada, 0.053 from ada-twin: too close to call
+    "ada-blurred": [0.9, 0.0, 0.3, 0.0],  # a poor photo of ada: 0.051 from ada
+    "ada-moved": [0.7, 0.0, 0.7, 0.0],  # half out of view: 0.29 from ada
     "bola": [0.0, 1.0, 0.0, 0.0],
     "chidi": [0.0, 0.0, 1.0, 0.0],
 }
@@ -141,7 +144,31 @@ class RegistrationTests(TestCase):
         response = self.post(reg_number="2021/222222", full_name="Bola Ade", level="300", face_image=photo("ada-sibling"))
         self.assertContains(response, "on the voting list")
         entry = AuditLog.objects.get(action="registered", reg_number="2021/222222")
-        self.assertEqual(entry.detail, "nearest other face distance 0.330")
+        self.assertIn("nearest other face distance 0.330", entry.detail)
+
+    def test_registration_stores_average_of_several_photos(self, _):
+        response = self.client.post(reverse("register"), {
+            "reg_number": "2021/111111", "full_name": "ada obi", "faculty": "Physical Sciences",
+            "department": "computer science", "level": "200", "email": "ada@example.com",
+            "phone": "08000000000", "face_image": photo("ada"),
+            "face_image_extra": [photo("ada-again"), photo("ada-blurred")],
+        })
+        self.assertContains(response, "on the voting list")
+        stored = Voter.objects.get(reg_number="2021/111111").face_embedding
+        self.assertLess(faces.distance(stored, FAKE_FACES["ada"]), 0.03)
+        self.assertNotEqual(stored, FAKE_FACES["ada"])
+        entry = AuditLog.objects.get(action="registered", reg_number="2021/111111")
+        self.assertIn("3 photo(s), spread 0.", entry.detail)
+
+    def test_photos_that_disagree_are_refused(self, _):
+        response = self.client.post(reverse("register"), {
+            "reg_number": "2021/111111", "full_name": "ada obi", "faculty": "Physical Sciences",
+            "department": "computer science", "level": "200", "email": "ada@example.com",
+            "phone": "08000000000", "face_image": photo("ada"),
+            "face_image_extra": [photo("ada-again"), photo("ada-moved")],
+        })
+        self.assertContains(response, "did not match each other")
+        self.assertFalse(Voter.objects.get(reg_number="2021/111111").is_registered)
 
     def test_no_face_detected(self, _):
         self.assertContains(self.post(face_image=photo("no-face")), "No face was detected")
@@ -208,6 +235,12 @@ class VotingTests(TestCase):
         self.assertIn("to 2021/222222", entry.detail)
         # The real owner of each registration still gets through.
         self.assertRedirects(self.accredit(), reverse("ballot"))
+
+    def test_face_too_close_to_another_student_is_refused(self, _):
+        # Nearer to Ada (0.049) than to Bola's look-alike face (0.053), but not clearly.
+        Voter.objects.filter(reg_number="2021/222222").update(face_embedding=FAKE_FACES["ada-twin"])
+        self.assertContains(self.accredit(face="ada-ambiguous"), "did not match")
+        self.assertTrue(AuditLog.objects.filter(action="face_closer_to_other", reg_number="2021/111111").exists())
 
     def test_unregistered_student_cannot_vote(self, _):
         self.assertContains(self.accredit(reg="2021/333333", face="chidi"), "not on the registered voters list")
