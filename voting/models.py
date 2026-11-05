@@ -107,11 +107,13 @@ class Candidate(models.Model):
 class Participation(models.Model):
     """Records THAT a voter voted, never WHAT they voted.
 
-    The unique constraint is what guarantees one ballot per voter.
+    The unique constraint is what guarantees one ballot per voter. When a student
+    leaves the roll (e.g. graduates) after an election, the row stays with no voter,
+    so the election's turnout figure is kept.
     """
 
     election = models.ForeignKey(Election, on_delete=models.PROTECT, related_name="participations")
-    voter = models.ForeignKey(Voter, on_delete=models.PROTECT, related_name="participations")
+    voter = models.ForeignKey(Voter, on_delete=models.SET_NULL, null=True, related_name="participations")
     voted_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

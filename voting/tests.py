@@ -514,10 +514,15 @@ class RollManagementTests(TestCase):
         self.assertTrue(AuditLog.objects.filter(action="registration_reset", reg_number=self.ada.reg_number).exists())
 
     def test_remove_only_if_not_voted(self):
-        election = Election.objects.create(title="SUG", status=Election.CLOSED)
+        election = Election.objects.create(title="SUG", status=Election.OPEN)
         Participation.objects.create(election=election, voter=self.ada)
         self.client.post(reverse("staff_voter_remove", args=[self.ada.pk]))
-        self.assertTrue(Voter.objects.filter(pk=self.ada.pk).exists())
+        self.assertTrue(Voter.objects.filter(pk=self.ada.pk).exists())  # not while voting is open
+        election.status = Election.CLOSED
+        election.save()
+        self.client.post(reverse("staff_voter_remove", args=[self.ada.pk]))
+        self.assertFalse(Voter.objects.filter(pk=self.ada.pk).exists())
+        self.assertEqual(Participation.objects.filter(election=election).count(), 1)  # turnout kept
         bola = Voter.objects.get(reg_number="2021/222222")
         self.assertRedirects(self.client.post(reverse("staff_voter_remove", args=[bola.pk])), reverse("staff_roll"))
         self.assertFalse(Voter.objects.filter(pk=bola.pk).exists())
@@ -530,6 +535,46 @@ class RollManagementTests(TestCase):
 
 
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="unnvote-test-media-"))
+class BulkRemoveTests(TestCase):
+    def setUp(self):
+        self.client.force_login(User.objects.create_superuser("committee", "c@example.com", "pass12345"))
+        for i, level in enumerate(["500", "500", "400", "300"]):
+            Voter.objects.create(reg_number=f"2020/00000{i}", full_name=f"S{i}", faculty="Eng",
+                                 department="EE", level=level, face_photo=f"faces/s{i}.jpg")
+        self.url = reverse("staff_roll_remove")
+
+    def test_level_filter_on_roll(self):
+        response = self.client.get(reverse("staff_roll"), {"level": "500"})
+        self.assertContains(response, "2 students")
+        self.assertContains(response, "Remove these students")
+
+    def test_remove_one_level_needs_typed_count(self):
+        page = self.client.get(self.url, {"level": "500"})
+        self.assertContains(page, "Type <strong>2</strong> to confirm")
+        self.client.post(self.url + "?level=500", {"confirm": "4"})
+        self.assertEqual(Voter.objects.count(), 4)
+        response = self.client.post(self.url + "?level=500", {"confirm": "2"})
+        self.assertRedirects(response, reverse("staff_roll"))
+        self.assertEqual(sorted(Voter.objects.values_list("level", flat=True)), ["300", "400"])
+        entry = AuditLog.objects.get(action="roll_removed")
+        self.assertIn("2 students at 500 level", entry.detail)
+
+    def test_clear_whole_roll_keeps_past_turnout(self):
+        election = Election.objects.create(title="SUG", status=Election.CLOSED)
+        Participation.objects.create(election=election, voter=Voter.objects.first())
+        self.assertContains(self.client.get(reverse("staff_roll")), "Clear whole roll")
+        self.client.post(self.url, {"confirm": "4"})
+        self.assertEqual(Voter.objects.count(), 0)
+        self.assertEqual(Participation.objects.filter(election=election).count(), 1)
+        self.assertIn("whole roll", AuditLog.objects.get(action="roll_removed").detail)
+
+    def test_refused_while_voting_is_open(self):
+        Election.objects.create(title="SUG", status=Election.OPEN)
+        self.client.post(self.url, {"confirm": "4"})
+        self.assertEqual(Voter.objects.count(), 4)
+        self.assertRedirects(self.client.get(self.url), reverse("staff_roll") + "?", fetch_redirect_response=False)
+
+
 class ElectionManagementTests(TestCase):
     def setUp(self):
         self.client.force_login(User.objects.create_superuser("committee", "c@example.com", "pass12345"))

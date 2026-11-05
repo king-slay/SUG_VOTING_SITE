@@ -76,6 +76,14 @@ account: the audit log records which account did what.
     Live results and a CSV download are on the committee results page.
 
 
+NEW SESSION (students who finished leave the roll)
+ - Voter roll > choose a Level (and/or Faculty) > Filter > "Remove these students".
+   Type the number shown to confirm. Example: remove 500 level after they graduate.
+ - Or, with no filter, "Clear whole roll", then upload the new list of students.
+ - Removed students lose their face registration. Results and turnout of past
+   elections are kept. Removing is not possible while voting is open.
+
+
 5. MOVING TO ANOTHER LAPTOP
 ---------------------------
  1. Stop the site on the old laptop (press Enter in its window).

@@ -12,6 +12,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
@@ -90,6 +91,7 @@ def filtered_roll(request):
     voters = Voter.objects.all()
     query = request.GET.get("q", "").strip()
     faculty = request.GET.get("faculty", "")
+    level = request.GET.get("level", "")
     status = request.GET.get("status", "")
     if query:
         voters = voters.filter(
@@ -97,11 +99,26 @@ def filtered_roll(request):
         )
     if faculty:
         voters = voters.filter(faculty=faculty)
+    if level:
+        voters = voters.filter(level=level)
     if status == "registered":
         voters = voters.exclude(registered_at=None)
     elif status == "not_registered":
         voters = voters.filter(registered_at=None)
-    return voters, {"q": query, "faculty": faculty, "status": status}
+    return voters, {"q": query, "faculty": faculty, "level": level, "status": status}
+
+
+def describe_filters(filters):
+    parts = []
+    if filters["q"]:
+        parts.append(f'matching "{filters["q"]}"')
+    if filters["faculty"]:
+        parts.append(f"in {filters['faculty']}")
+    if filters["level"]:
+        parts.append(f"at {filters['level']} level")
+    if filters["status"]:
+        parts.append(ROLL_STATUS[filters["status"]].lower())
+    return ", ".join(parts)
 
 
 @committee_required
@@ -118,6 +135,7 @@ def roll_list(request):
             "filters": filters,
             "querystring": querystring.urlencode(),
             "faculties": Voter.objects.order_by("faculty").values_list("faculty", flat=True).distinct(),
+            "levels": sorted(set(Voter.objects.values_list("level", flat=True)), key=lambda l: (len(l), l)),
             "statuses": ROLL_STATUS,
             "total": Voter.objects.count(),
         },
@@ -167,19 +185,50 @@ def voter_reset_face(request, voter_id):
     return redirect("staff_voter", voter.pk)
 
 
+def delete_voters(voters):
+    """Remove students from the roll with their face photos. Past turnout figures are kept."""
+    for photo in voters.exclude(face_photo="").values_list("face_photo", flat=True):
+        Voter.face_photo.field.storage.delete(photo)
+    return voters.delete()[1].get("voting.Voter", 0)
+
+
 @committee_required
 @require_POST
 def voter_remove(request, voter_id):
     voter = get_object_or_404(Voter, pk=voter_id)
-    if voter.participations.exists():
-        messages.error(request, "This student has already voted, so they stay on the roll for the record.")
+    if Election.current():
+        messages.error(request, "Students cannot be removed while voting is open.")
         return redirect("staff_voter", voter.pk)
-    if voter.face_photo:
-        voter.face_photo.delete(save=False)
     log(request, "voter_removed", voter.full_name, voter.reg_number)
-    voter.delete()
+    delete_voters(Voter.objects.filter(pk=voter.pk))
     messages.success(request, f"{voter.full_name} ({voter.reg_number}) was removed from the voter roll.")
     return redirect("staff_roll")
+
+
+@committee_required
+def roll_remove(request):
+    """Remove every student the roll filters select (e.g. one level), or the whole roll.
+    The committee confirms by typing how many students will go."""
+    voters, filters = filtered_roll(request)
+    count = voters.count()
+    description = describe_filters(filters)
+    querystring = request.GET.urlencode()
+    if Election.current():
+        messages.error(request, "Students cannot be removed while voting is open. Close the election first.")
+        return redirect(f"{reverse('staff_roll')}?{querystring}")
+    error = ""
+    if request.method == "POST":
+        if request.POST.get("confirm", "").strip() != str(count):
+            error = f"Type {count} to confirm."
+        else:
+            removed = delete_voters(voters)
+            log(request, "roll_removed", f"{removed} students" + (f" {description}" if description else " (whole roll)"))
+            messages.success(request, f"{removed} student{'s' if removed != 1 else ''} removed from the voter roll.")
+            return redirect("staff_roll")
+    return render(request, "staff/roll_remove.html", {
+        "count": count, "description": description, "querystring": querystring, "error": error,
+        "sample": voters[:10], "whole_roll": not description,
+    })
 
 
 # ---------- Elections, positions and candidates ----------

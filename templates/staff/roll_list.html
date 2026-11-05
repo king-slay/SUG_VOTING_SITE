@@ -7,6 +7,7 @@
   <h1>Voter roll</h1>
   <div class="actions tight">
     <a class="btn secondary sm" href="{% url 'staff_roll_export' %}?{{ querystring }}">Download list</a>
+    {% if total %}<a class="btn danger sm" href="{% url 'staff_roll_remove' %}?{{ querystring }}">{% if filters.q or filters.faculty or filters.level or filters.status %}Remove these students{% else %}Clear whole roll{% endif %}</a>{% endif %}
     <a class="btn sm" href="{% url 'staff_roll_upload' %}">Upload roll</a>
   </div>
 </div>
@@ -22,6 +23,13 @@
     <select name="faculty" id="faculty">
       <option value="">All faculties</option>
       {% for f in faculties %}<option value="{{ f }}"{% if f == filters.faculty %} selected{% endif %}>{{ f }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="level">Level</label>
+    <select name="level" id="level">
+      <option value="">All levels</option>
+      {% for l in levels %}<option value="{{ l }}"{% if l == filters.level %} selected{% endif %}>{{ l }}</option>{% endfor %}
     </select>
   </div>
   <div class="field">

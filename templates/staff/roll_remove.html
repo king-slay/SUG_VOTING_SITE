@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Remove students | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+{% include "staff/_nav.html" %}
+<div class="narrow">
+  <p class="crumb"><a href="{% url 'staff_roll' %}?{{ querystring }}">&larr; Voter roll</a></p>
+  <h1 class="form-title">{% if whole_roll %}Clear the whole voter roll{% else %}Remove these students{% endif %}</h1>
+  <form method="post" action="?{{ querystring }}" class="panel">
+    {% csrf_token %}
+    {% if count %}
+      <p>This removes <strong>{{ count }} student{{ count|pluralize }}</strong>{% if whole_roll %}, everyone on the roll{% else %} {{ description }}{% endif %}, together with their face registrations. It cannot be undone.</p>
+      <ul class="small">
+        {% for v in sample %}<li>{{ v.full_name }} ({{ v.reg_number }}, {{ v.level }})</li>{% endfor %}
+        {% if count > 10 %}<li class="muted">and {{ count|add:"-10" }} more</li>{% endif %}
+      </ul>
+      <p class="small">Results and turnout of past elections are kept. To bring students back, upload a roll that includes them; they then register their face again.</p>
+      <div class="field">
+        <label for="confirm">Type <strong>{{ count }}</strong> to confirm</label>
+        <input type="text" name="confirm" id="confirm" inputmode="numeric" autocomplete="off" required>
+        {% if error %}<ul class="errorlist"><li>{{ error }}</li></ul>{% endif %}
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn danger">Remove {{ count }} student{{ count|pluralize }}</button>
+        <a class="btn secondary" href="{% url 'staff_roll' %}?{{ querystring }}">Cancel</a>
+      </div>
+    {% else %}
+      <p>No students match these filters, so there is nothing to remove.</p>
+      <a class="btn secondary" href="{% url 'staff_roll' %}">Back to the voter roll</a>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

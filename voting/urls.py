@@ -22,6 +22,7 @@ urlpatterns = [
     path("staff/roll/", staff_views.roll_list, name="staff_roll"),
     path("staff/roll/upload/", staff_views.roll_upload, name="staff_roll_upload"),
     path("staff/roll/template.csv", staff_views.roll_template, name="staff_roll_template"),
+    path("staff/roll/remove/", staff_views.roll_remove, name="staff_roll_remove"),
     path("staff/roll/export.csv", staff_views.roll_export, name="staff_roll_export"),
     path("staff/roll/<int:voter_id>/", staff_views.voter_detail, name="staff_voter"),
     path("staff/roll/<int:voter_id>/reset-face/", staff_views.voter_reset_face, name="staff_voter_reset_face"),
