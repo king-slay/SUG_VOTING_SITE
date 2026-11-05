@@ -123,3 +123,47 @@ class CandidateForm(forms.ModelForm):
             if photo.size > 3 * 1024 * 1024:
                 raise forms.ValidationError("The photo is larger than 3 MB.")
         return photo
+
+
+class CommitteeMemberForm(forms.Form):
+    """A new committee account. Each member signs in with their own username, so the
+    audit log shows who did what."""
+
+    username = forms.CharField(max_length=150, help_text="What they type to sign in, e.g. their first name.")
+    full_name = forms.CharField(max_length=150, required=False, label="Full name")
+    password1 = forms.CharField(label="Password", widget=forms.PasswordInput, strip=False,
+                                help_text="At least 8 characters. They can change it after signing in.")
+    password2 = forms.CharField(label="Password again", widget=forms.PasswordInput, strip=False)
+    chair = forms.BooleanField(required=False, label="Chair (can add and manage committee accounts)")
+
+    def clean_username(self):
+        from django.contrib.auth.models import User
+
+        username = self.cleaned_data["username"].strip()
+        if User.objects.filter(username__iexact=username).exists():
+            raise forms.ValidationError("That username is already taken.")
+        return username
+
+    def clean(self):
+        from django.contrib.auth.password_validation import validate_password
+
+        data = super().clean()
+        p1, p2 = data.get("password1"), data.get("password2")
+        if p1 and p2 and p1 != p2:
+            self.add_error("password2", "The two passwords do not match.")
+        elif p1:
+            try:
+                validate_password(p1)
+            except forms.ValidationError as error:
+                self.add_error("password1", error)
+        return data
+
+    def save(self):
+        from django.contrib.auth.models import User
+
+        data = self.cleaned_data
+        first, _, last = data["full_name"].strip().partition(" ")
+        return User.objects.create_user(
+            data["username"], password=data["password1"], first_name=first, last_name=last,
+            is_staff=True, is_superuser=data["chair"],
+        )

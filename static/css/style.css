@@ -654,3 +654,6 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 @media (max-width: 360px) {
   .nav a:not(.nav-cta) { padding: 8px 6px; }
 }
+.field input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
+.row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.row-actions form { margin: 0; }

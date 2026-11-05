@@ -4,7 +4,7 @@
 {% block content %}
 {% include "staff/_nav.html" %}
 <div class="narrow">
-  <p class="crumb">{% if back_election %}<a href="{% url 'staff_election' back_election.pk %}">&larr; {{ back_election.title }}</a>{% else %}<a href="{% url 'staff_dashboard' %}">&larr; Dashboard</a>{% endif %}</p>
+  <p class="crumb">{% if back_election %}<a href="{% url 'staff_election' back_election.pk %}">&larr; {{ back_election.title }}</a>{% elif back_url %}<a href="{% url back_url %}">&larr; Back</a>{% else %}<a href="{% url 'staff_dashboard' %}">&larr; Dashboard</a>{% endif %}</p>
   <h1 class="form-title">{{ heading }}</h1>
   <form method="post" class="panel"{% if multipart %} enctype="multipart/form-data"{% endif %}>
     {% csrf_token %}
@@ -19,7 +19,7 @@
     {% endfor %}
     <div class="actions">
       <button type="submit" class="btn">{{ submit }}</button>
-      <a class="btn secondary" href="{% if back_election %}{% url 'staff_election' back_election.pk %}{% else %}{% url 'staff_dashboard' %}{% endif %}">Cancel</a>
+      <a class="btn secondary" href="{% if back_election %}{% url 'staff_election' back_election.pk %}{% elif back_url %}{% url back_url %}{% else %}{% url 'staff_dashboard' %}{% endif %}">Cancel</a>
     </div>
   </form>
 </div>

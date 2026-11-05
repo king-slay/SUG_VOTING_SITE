@@ -1,10 +1,13 @@
 """Electoral committee pages: dashboard, voter roll, elections and candidates,
-live results, audit log."""
+live results, audit log, committee accounts."""
 
 import csv
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm
+from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
@@ -13,7 +16,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
 from .audit import log
-from .forms import CandidateForm, ElectionForm, PositionForm, RollUploadForm
+from .forms import CandidateForm, CommitteeMemberForm, ElectionForm, PositionForm, RollUploadForm
 from .models import AuditLog, Candidate, Election, Position, Voter
 from .results import tally, turnout
 from .roll import REQUIRED_HEADERS, import_roll
@@ -413,3 +416,87 @@ def audit_log(request):
         entries = entries.filter(reg_number__icontains=query) | entries.filter(action__icontains=query)
     page = Paginator(entries, 50).get_page(request.GET.get("page"))
     return render(request, "staff/audit.html", {"page": page, "query": query})
+
+
+# ---------- Committee accounts ----------
+# Every committee member has their own account. Chairs can add members, reset their
+# passwords and switch accounts off; everyone can change their own password.
+
+
+def chair_required(view):
+    @committee_required
+    def wrapped(request, *args, **kwargs):
+        if not request.user.is_superuser:
+            messages.error(request, "Only a chair can manage committee accounts.")
+            return redirect("staff_dashboard")
+        return view(request, *args, **kwargs)
+
+    wrapped.__name__ = view.__name__
+    return wrapped
+
+
+@chair_required
+def committee(request):
+    members = User.objects.filter(is_staff=True).order_by("-is_active", "-is_superuser", "username")
+    return render(request, "staff/committee.html", {"members": members})
+
+
+@chair_required
+def committee_new(request):
+    form = CommitteeMemberForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        member = form.save()
+        log(request, "committee_added", f"{member.username} ({'chair' if member.is_superuser else 'member'})")
+        messages.success(request, f"Account {member.username} created. Give them the password; they can change it after signing in.")
+        return redirect("staff_committee")
+    return render(request, "staff/form.html", {"form": form, "heading": "Add a committee member", "submit": "Create account", "back_url": "staff_committee"})
+
+
+@chair_required
+def committee_password(request, user_id):
+    member = get_object_or_404(User, pk=user_id, is_staff=True)
+    form = SetPasswordForm(member, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        if member == request.user:
+            update_session_auth_hash(request, member)
+        log(request, "committee_password_reset", member.username)
+        messages.success(request, f"New password set for {member.username}.")
+        return redirect("staff_committee")
+    return render(request, "staff/form.html", {"form": form, "heading": f"New password for {member.username}", "submit": "Set password", "back_url": "staff_committee"})
+
+
+@chair_required
+@require_POST
+def committee_change(request, user_id):
+    member = get_object_or_404(User, pk=user_id, is_staff=True)
+    action = request.POST.get("action")
+    if member == request.user:
+        messages.error(request, "You cannot switch off or demote your own account. Ask another chair.")
+        return redirect("staff_committee")
+    changes = {
+        "disable": ("is_active", False, "switched off"),
+        "enable": ("is_active", True, "switched back on"),
+        "chair": ("is_superuser", True, "made a chair"),
+        "member": ("is_superuser", False, "made an ordinary member"),
+    }
+    if action not in changes:
+        return redirect("staff_committee")
+    field, value, words = changes[action]
+    setattr(member, field, value)
+    member.save(update_fields=[field])
+    log(request, f"committee_{action}", member.username)
+    messages.success(request, f"{member.username} {words}.")
+    return redirect("staff_committee")
+
+
+@committee_required
+def my_password(request):
+    form = PasswordChangeForm(request.user, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        update_session_auth_hash(request, form.user)
+        log(request, "committee_password_changed", request.user.username)
+        messages.success(request, "Your password has been changed.")
+        return redirect("staff_dashboard")
+    return render(request, "staff/form.html", {"form": form, "heading": "Change my password", "submit": "Change password"})
