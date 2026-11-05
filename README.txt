@@ -1,5 +1,6 @@
 UNN SUG E-VOTING: GUIDE FOR THE DEFENCE TEAM
 ============================================
+(c) 2026 KingSlay. All rights reserved.
 
 The site runs on a Windows laptop. A free Cloudflare link puts it on the internet,
 so anyone can open it on their phone by scanning a QR code. You do not need to
