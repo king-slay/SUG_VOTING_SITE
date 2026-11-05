@@ -14,6 +14,8 @@ class VotingConfig(AppConfig):
         # first voter's scan after every restart. Under runserver, load them in the
         # background as soon as the server starts (in the process that serves requests).
         serving = "runserver" in sys.argv and (os.environ.get("RUN_MAIN") == "true" or "--noreload" in sys.argv)
+        # Production servers: gunicorn on Linux, waitress on the Windows laptop.
+        serving = serving or any(name in sys.argv[0] for name in ("gunicorn", "waitress"))
         if serving:
             from . import faces
 

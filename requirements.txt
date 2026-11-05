@@ -6,6 +6,10 @@ tensorflow
 tf-keras
 werkzeug  # imported by deepface but not declared as its dependency
 numpy
+gunicorn; sys_platform != "win32"  # production server (Linux)
+waitress  # production server on Windows (defence/start.bat)
+whitenoise  # serves static files when DEBUG is off
+qrcode  # QR code of the public link (defence/show_link.py)
 openpyxl  # reads voter rolls uploaded as Excel .xlsx
 # MySQL driver for production. On Windows, if this fails to build, use: pip install mysqlclient --only-binary :all:
 mysqlclient

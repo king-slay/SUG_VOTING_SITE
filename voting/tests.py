@@ -532,6 +532,37 @@ class ElectionManagementTests(TestCase):
         self.assertIn("President,Ada,,1,100.0,yes", response.content.decode("utf-8-sig"))
 
 
+class MediaTests(TestCase):
+    def setUp(self):
+        import os
+
+        self.root = tempfile.mkdtemp(prefix="unnvote-test-media-")
+        for folder in ("candidates", "faces"):
+            os.makedirs(os.path.join(self.root, folder))
+            with open(os.path.join(self.root, folder, "a.jpg"), "wb") as f:
+                f.write(b"jpeg")
+
+    def test_candidate_photos_public_face_photos_staff_only(self):
+        with self.settings(MEDIA_ROOT=self.root):
+            self.assertEqual(self.client.get("/media/candidates/a.jpg").status_code, 200)
+            self.assertEqual(self.client.get("/media/faces/a.jpg").status_code, 404)
+            self.assertEqual(self.client.get("/media/candidates/../faces/a.jpg").status_code, 404)
+            self.client.force_login(User.objects.create_superuser("committee", "c@example.com", "pass12345"))
+            self.assertEqual(self.client.get("/media/faces/a.jpg").status_code, 200)
+
+
+class ProductionSettingsTests(TestCase):
+    def test_refuses_dev_secret_key_without_debug(self):
+        import subprocess
+        import sys
+
+        env = {**__import__("os").environ, "DJANGO_DEBUG": "false", "DJANGO_SECRET_KEY": ""}
+        env.pop("DJANGO_SECRET_KEY")
+        result = subprocess.run([sys.executable, "manage.py", "check"], env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("DJANGO_SECRET_KEY", result.stderr)
+
+
 class FaceMathTests(TestCase):
     def test_distance(self):
         self.assertAlmostEqual(faces.distance([1, 0], [1, 0]), 0.0)

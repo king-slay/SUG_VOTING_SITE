@@ -1,6 +1,7 @@
 """Student-facing pages: registration, election-day voting, public results."""
 
 import base64
+import posixpath
 import uuid
 from datetime import datetime, timedelta
 
@@ -8,8 +9,10 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.static import serve
 
 from . import faces
 from .audit import log
@@ -231,6 +234,14 @@ def public_results(request, election_id):
         Election, pk=election_id, status=Election.CLOSED, results_public=True
     )
     return render(request, "voting/results.html", {"election": election, "results": tally(election)})
+
+
+def media_file(request, path):
+    """Uploaded files. Candidate photos are public; registered face photos are for the committee only."""
+    path = posixpath.normpath(path).lstrip("/")  # so "candidates/../faces/x" is judged as "faces/x"
+    if not path.startswith("candidates/") and not request.user.is_staff:
+        raise Http404
+    return serve(request, path, document_root=settings.MEDIA_ROOT)
 
 
 def candidate_list(request):
