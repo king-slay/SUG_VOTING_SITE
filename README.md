@@ -113,6 +113,32 @@ Open that on the phones. The address changes each time `cloudflared` restarts.
 While `DJANGO_DEBUG` is on (the default), the site accepts `*.trycloudflare.com`
 addresses without extra settings.
 
+## Hosting (Oracle Cloud Always Free)
+
+`deploy/setup.sh` installs the site on a fresh Ubuntu 24.04 server: MySQL,
+the app under gunicorn (one worker, so one copy of the face models in memory),
+and Caddy for HTTPS with an automatic certificate. The address is
+`https://<public-ip-with-dashes>.sslip.io` unless `DOMAIN` is set.
+
+1. Create an Ampere A1 instance (Ubuntu 24.04, 2 OCPU / 12 GB is plenty).
+2. In its subnet's security list, add ingress rules for TCP ports 80 and 443
+   from `0.0.0.0/0`.
+3. SSH in and run:
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/king-slay/SUG_VOTING_SITE/main/deploy/setup.sh -o setup.sh
+   sudo bash setup.sh
+   sudo unnvote-manage createsuperuser
+   ```
+
+Settings (database password, secret key) live in `/etc/unnvote.env`. Run
+`sudo bash setup.sh` again to update to the latest code; `sudo unnvote-manage
+<command>` runs any `manage.py` command, e.g. `practice_election setup`.
+Logs: `journalctl -u unnvote -f`.
+
+With `DJANGO_DEBUG=false` the site refuses to start without `DJANGO_SECRET_KEY`,
+sends secure cookies and HSTS, and serves registered face photos only to
+committee members (candidate photos stay public).
+
 ## Face recognition
 
 Each snapshot goes through three steps (`voting/faces.py`):

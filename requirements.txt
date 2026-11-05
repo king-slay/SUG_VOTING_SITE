@@ -6,6 +6,7 @@ tensorflow
 tf-keras
 werkzeug  # imported by deepface but not declared as its dependency
 numpy
+gunicorn; sys_platform != "win32"  # production server (Linux)
 openpyxl  # reads voter rolls uploaded as Excel .xlsx
 # MySQL driver for production. On Windows, if this fails to build, use: pip install mysqlclient --only-binary :all:
 mysqlclient
