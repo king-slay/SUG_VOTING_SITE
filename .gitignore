@@ -6,3 +6,9 @@ staticfiles/
 .venv/
 venv/
 .env
+
+# defence kit
+defence/secret.txt
+defence/local.env
+defence/link.html
+defence/*.log

@@ -113,6 +113,22 @@ Open that on the phones. The address changes each time `cloudflared` restarts.
 While `DJANGO_DEBUG` is on (the default), the site accepts `*.trycloudflare.com`
 addresses without extra settings.
 
+## Defence day (laptop + public link)
+
+Free cloud servers were not an option, so on defence day the site runs on the laptop and a
+Cloudflare quick tunnel gives it a public https address that any phone can open.
+
+1. Once: `pip install -r requirements.txt` in the venv, and `winget install --id Cloudflare.cloudflared`.
+2. Double-click `defence\start.bat`. It:
+   - turns on production mode (DEBUG off, a secret key kept in `defence\secret.txt`),
+   - migrates the database and collects static files,
+   - starts the site with waitress on port 8000 (its log opens in a second window),
+   - opens the tunnel and shows the link as a QR code in the browser (`defence\link.html`).
+3. Press Enter in the start window to stop everything.
+
+The link changes every time the kit starts, so print the QR page only after starting it.
+Extra settings, such as the `MYSQL_` ones, can go in `defence\local.env`, one `NAME=value` per line.
+
 ## Hosting (Oracle Cloud Always Free)
 
 `deploy/setup.sh` installs the site on a fresh Ubuntu 24.04 server: MySQL,
