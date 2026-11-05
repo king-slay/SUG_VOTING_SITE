@@ -41,7 +41,7 @@ def register(request):
         images = ([form.cleaned_data["face_image"]] + [i for i in request.POST.getlist("face_image_extra") if i])[:5]
         try:
             embedding, spread = faces.combine([faces.get_embedding(image) for image in images])
-            others = Voter.objects.exclude(pk=voter.pk).exclude(face_embedding=None)
+            others = Voter.objects.exclude(pk=voter.pk).exclude(face_embedding__isnull=True)
             duplicate, nearest = faces.find_duplicate(embedding, others)
         except faces.SpoofError as exc:
             log(request, "spoof_rejected", "registration", voter.reg_number)
@@ -119,7 +119,7 @@ def _check_face(request, voter, data_url):
         return "Your face did not match the registered face for this registration number. Please try again.", dist
     # A look-alike (e.g. a sibling) can come under the threshold for someone else's
     # registration. Refuse unless the claimed voter is clearly the closest face.
-    other, other_dist = faces.nearest_face(embedding, Voter.objects.exclude(pk=voter.pk).exclude(face_embedding=None))
+    other, other_dist = faces.nearest_face(embedding, Voter.objects.exclude(pk=voter.pk).exclude(face_embedding__isnull=True))
     if other is not None and other_dist < dist + settings.FACE_MATCH_MARGIN:
         log(
             request, "face_closer_to_other",

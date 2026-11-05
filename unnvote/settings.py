@@ -117,26 +117,30 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 
-# Face verification. Facenet512 + cosine distance: lower distance = more alike.
-FACE_MODEL = os.environ.get("FACE_MODEL", "Facenet512")
-FACE_DETECTOR = os.environ.get("FACE_DETECTOR", "retinaface")
-# Max distance to accept a face. DeepFace suggests 0.30 for Facenet512, but in the
-# practice run a sibling posing as his brother scored 0.17-0.34 while real owners
-# with a good registration scored 0.05-0.14.
-FACE_MATCH_THRESHOLD = float(os.environ.get("FACE_MATCH_THRESHOLD", "0.25"))
+# Face verification. InsightFace ArcFace (buffalo_l w600k_r50) on faces found and
+# aligned by OpenCV's YuNet; cosine distance, lower = more alike. On DeepFace's
+# labelled test photos the closest two different people scored 0.80 and the same
+# person at most 0.49 (Facenet512, the previous model: 0.48 and 0.42).
+# The recognition model (174 MB) downloads to FACE_MODEL_DIR on first use.
+FACE_MODEL_DIR = Path(os.environ.get("FACE_MODEL_DIR", Path.home() / ".unnvote" / "models"))
+# Max distance to accept a face. Same-person photos years apart reach 0.49; a live
+# scan against a fresh 3-photo registration is normally far below that.
+FACE_MATCH_THRESHOLD = float(os.environ.get("FACE_MATCH_THRESHOLD", "0.45"))
 # A face must also be clearly closer to the claimed voter than to anyone else
 # registered: if another voter's face is within this margin, the scan is refused
 # as too close to call (e.g. siblings), rather than guessed.
-FACE_MATCH_MARGIN = float(os.environ.get("FACE_MATCH_MARGIN", "0.08"))
+FACE_MATCH_MARGIN = float(os.environ.get("FACE_MATCH_MARGIN", "0.10"))
 # Threshold for refusing a registration because the face already belongs to
 # another registered voter (one person, one registration). It equals the match
 # threshold: a face is a duplicate exactly when it would pass as that voter on
-# election day. A looser value blocked real siblings in the practice run.
+# election day.
 FACE_DUPLICATE_THRESHOLD = float(os.environ.get("FACE_DUPLICATE_THRESHOLD", str(FACE_MATCH_THRESHOLD)))
 # Registration takes several photos and stores their average. If any two differ by
 # more than this (blur, movement, a face half out of view), the registration is
 # refused so no student is stored with a weak face record.
-FACE_ENROL_CONSISTENCY = float(os.environ.get("FACE_ENROL_CONSISTENCY", "0.15"))
+FACE_ENROL_CONSISTENCY = float(os.environ.get("FACE_ENROL_CONSISTENCY", "0.25"))
+# Faces smaller than this (pixels, eye to chin roughly) are too far from the camera to trust.
+FACE_MIN_SIZE = int(os.environ.get("FACE_MIN_SIZE", "80"))
 # DeepFace's anti-spoofing (liveness) check: rejects photos and screens held up to
 # the camera. Runs on TensorFlow. Set to false only for local debugging.
 FACE_ANTI_SPOOFING = env_bool("FACE_ANTI_SPOOFING", True)
