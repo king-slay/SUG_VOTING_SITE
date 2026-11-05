@@ -51,11 +51,11 @@
   {% else %}<p class="muted">Nothing logged for this student yet.</p>{% endif %}
 </section>
 
-{% if not voted_in %}
+{% if registration_open %}
 <form method="post" action="{% url 'staff_voter_remove' voter.pk %}" class="panel" data-confirm="Remove {{ voter.full_name }} from the voter roll?">
   {% csrf_token %}
   <h2>Remove from roll</h2>
-  <p class="small">Use this if the student is not eligible. Uploading a roll that includes them again adds them back.</p>
+  <p class="small">Use this if the student is not eligible or has left. Uploading a roll that includes them again adds them back. Past election turnout figures are kept.</p>
   <button type="submit" class="btn danger sm">Remove student</button>
 </form>
 {% endif %}

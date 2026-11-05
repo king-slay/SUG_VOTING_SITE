@@ -657,3 +657,5 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fo
 .field input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--accent); }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .row-actions form { margin: 0; }
+.footer .copyright { margin-left: auto; }
+@media (max-width: 640px) { .footer .copyright { margin-left: 0; } }
