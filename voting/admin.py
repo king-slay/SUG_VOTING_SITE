@@ -60,13 +60,9 @@ class ElectionAdmin(admin.ModelAdmin):
             self.message_user(request, "Select exactly one election to open.", messages.ERROR)
             return
         election = queryset.get()
-        if Election.objects.filter(status=Election.OPEN).exclude(pk=election.pk).exists():
-            self.message_user(request, "Another election is already open. Close it first.", messages.ERROR)
-            return
-        if not election.positions.exists() or any(
-            not p.candidates.exists() for p in election.positions.all()
-        ):
-            self.message_user(request, "Every position needs at least one candidate.", messages.ERROR)
+        problems = election.open_problems()
+        if problems:
+            self.message_user(request, " ".join(problems), messages.ERROR)
             return
         election.status = Election.OPEN
         election.save()

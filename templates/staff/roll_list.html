@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Voter roll | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+{% include "staff/_nav.html" %}
+<div class="title-row">
+  <h1>Voter roll</h1>
+  <div class="actions tight">
+    <a class="btn secondary sm" href="{% url 'staff_roll_export' %}?{{ querystring }}">Download list</a>
+    <a class="btn sm" href="{% url 'staff_roll_upload' %}">Upload roll</a>
+  </div>
+</div>
+
+{% if total %}
+<form method="get" class="filters" role="search">
+  <div class="field">
+    <label for="q">Search</label>
+    <input type="search" name="q" id="q" value="{{ filters.q }}" placeholder="Name, reg number or department">
+  </div>
+  <div class="field">
+    <label for="faculty">Faculty</label>
+    <select name="faculty" id="faculty">
+      <option value="">All faculties</option>
+      {% for f in faculties %}<option value="{{ f }}"{% if f == filters.faculty %} selected{% endif %}>{{ f }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="status">Face registration</label>
+    <select name="status" id="status">
+      <option value="">Everyone</option>
+      {% for key, label in statuses.items %}<option value="{{ key }}"{% if key == filters.status %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="btn secondary">Filter</button>
+</form>
+{% endif %}
+
+<section class="panel flush">
+  <div class="table-wrap">
+    <table class="log">
+      <thead><tr><th>Name</th><th>Reg number</th><th class="hide-sm">Faculty / department</th><th class="hide-sm">Level</th><th>Registered</th></tr></thead>
+      <tbody>
+      {% for v in page %}
+        <tr>
+          <td><a href="{% url 'staff_voter' v.pk %}">{{ v.full_name }}</a><span class="small muted block show-sm">{{ v.department }} &middot; {{ v.level }}L</span></td>
+          <td class="nowrap tnum">{{ v.reg_number }}</td>
+          <td class="hide-sm">{{ v.faculty }}<span class="small muted block">{{ v.department }}</span></td>
+          <td class="tnum hide-sm">{{ v.level }}</td>
+          <td>{% if v.registered_at %}<span class="pill open">Registered</span>{% else %}<span class="pill">Not yet</span>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="empty">{% if total %}No students match these filters.{% else %}The voter roll is empty. <a href="{% url 'staff_roll_upload' %}">Upload a CSV or Excel file</a> to add students.{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page.paginator.count %}
+  <p class="pager">
+    {% if page.has_previous %}<a class="btn secondary sm" href="?{{ querystring }}&page={{ page.previous_page_number }}">Previous</a>{% endif %}
+    <span>{{ page.paginator.count }} student{{ page.paginator.count|pluralize }} &middot; page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="btn secondary sm" href="?{{ querystring }}&page={{ page.next_page_number }}">Next</a>{% endif %}
+  </p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}{{ election.title }} | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+{% include "staff/_nav.html" %}
+<p class="crumb"><a href="{% url 'staff_dashboard' %}">&larr; Dashboard</a></p>
+<div class="title-row">
+  <h1>{{ election.title }} <span class="pill {{ election.status }}">{{ election.get_status_display }}</span></h1>
+  {% if election.status != "draft" %}<a class="btn secondary" href="{% url 'staff_results' election.pk %}">{% if election.status == "open" %}Live results{% else %}Results{% endif %}</a>{% endif %}
+</div>
+
+<section class="panel stage">
+  {% if election.status == "draft" %}
+    <div>
+      <h2>Ready to open?</h2>
+      {% if problems %}
+        <p>Before voting can open:</p>
+        <ul class="todo">{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+      {% else %}
+        <p>Every position has a candidate. Opening voting closes student registration, and the ballot can no longer be edited.</p>
+      {% endif %}
+    </div>
+    <form method="post" action="{% url 'staff_election_status' election.pk %}" data-confirm="Open voting for {{ election.title }}? Registration closes and the ballot can no longer be edited.">
+      {% csrf_token %}<input type="hidden" name="action" value="open">
+      <button type="submit" class="btn"{% if problems %} disabled{% endif %}>Open voting</button>
+    </form>
+  {% elif election.status == "open" %}
+    <div>
+      <h2><span class="live"><span class="dot" aria-hidden="true"></span>Voting is open</span></h2>
+      <p>{{ turnout.voted }} of {{ turnout.registered }} registered students have voted ({{ turnout.percent }}%). Close voting when the polls close.</p>
+    </div>
+    <form method="post" action="{% url 'staff_election_status' election.pk %}" data-confirm="Close voting now? Students will no longer be able to vote in {{ election.title }}.">
+      {% csrf_token %}<input type="hidden" name="action" value="close">
+      <button type="submit" class="btn danger">Close voting</button>
+    </form>
+  {% else %}
+    <div>
+      <h2>Voting has closed</h2>
+      <p>{{ turnout.voted }} of {{ turnout.registered }} registered students voted ({{ turnout.percent }}%).
+      {% if election.results_public %}Results are public on the site.{% else %}Results are only visible to the committee.{% endif %}</p>
+    </div>
+    <form method="post" action="{% url 'staff_election_status' election.pk %}">
+      {% csrf_token %}
+      {% if election.results_public %}
+        <input type="hidden" name="action" value="unpublish"><button type="submit" class="btn secondary">Hide results</button>
+      {% else %}
+        <input type="hidden" name="action" value="publish"><button type="submit" class="btn">Publish results</button>
+      {% endif %}
+    </form>
+  {% endif %}
+</section>
+
+<div class="title-row section-head">
+  <h2>Ballot</h2>
+  {% if election.is_editable %}<a class="btn sm" href="{% url 'staff_position_new' election.pk %}">Add position</a>{% endif %}
+</div>
+{% if not election.is_editable %}<p class="small muted">The ballot is locked because voting has opened.</p>{% endif %}
+
+{% for position in positions %}
+  <section class="panel office-admin">
+    <div class="office-head">
+      <h3><span class="order tnum">{{ forloop.counter }}</span>{{ position.title }}</h3>
+      {% if election.is_editable %}
+      <div class="row-actions">
+        <a href="{% url 'staff_position_edit' position.pk %}">Edit</a>
+        <form method="post" action="{% url 'staff_position_delete' position.pk %}" data-confirm="Remove {{ position.title }} and all its candidates?">{% csrf_token %}<button type="submit" class="linklike danger">Remove</button></form>
+      </div>
+      {% endif %}
+    </div>
+    <ul class="cand-list">
+      {% for c in position.candidates.all %}
+        <li>
+          {% if c.photo %}<img class="avatar" src="{{ c.photo.url }}" alt="">{% else %}<span class="avatar" aria-hidden="true">{{ c.name|slice:":1" }}</span>{% endif %}
+          <div class="who"><strong>{{ c.name }}</strong><span class="small muted">{{ c.department|default:"No department" }}{% if not c.manifesto %} &middot; no manifesto{% endif %}</span></div>
+          {% if election.is_editable %}
+          <div class="row-actions">
+            <a href="{% url 'staff_candidate_edit' c.pk %}">Edit</a>
+            <form method="post" action="{% url 'staff_candidate_delete' c.pk %}" data-confirm="Remove {{ c.name }}?">{% csrf_token %}<button type="submit" class="linklike danger">Remove</button></form>
+          </div>
+          {% endif %}
+        </li>
+      {% empty %}
+        <li class="muted">No candidates yet.</li>
+      {% endfor %}
+    </ul>
+    {% if election.is_editable %}<a class="btn secondary sm" href="{% url 'staff_candidate_new' position.pk %}">Add candidate</a>{% endif %}
+  </section>
+{% empty %}
+  <section class="panel"><p class="muted">No positions yet. Add the offices students will vote for, such as President or General Secretary.</p></section>
+{% endfor %}
+
+<div class="staff-grid settings">
+  <form method="post" action="{% url 'staff_election_rename' election.pk %}" class="panel">
+    {% csrf_token %}
+    <h2>Rename</h2>
+    <div class="field"><label for="id_title">Election title</label>{{ rename_form.title }}</div>
+    <div class="actions"><button type="submit" class="btn secondary sm">Save title</button></div>
+  </form>
+  {% if election.is_editable %}
+  <form method="post" action="{% url 'staff_election_delete' election.pk %}" class="panel" data-confirm="Delete {{ election.title }} with all its positions and candidates? This cannot be undone.">
+    {% csrf_token %}
+    <h2>Delete election</h2>
+    <p class="small">Only possible before voting opens. Removes all its positions and candidates.</p>
+    <div class="actions"><button type="submit" class="btn danger sm">Delete election</button></div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}{% include "staff/_confirm.html" %}{% endblock %}

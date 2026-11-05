@@ -3,9 +3,18 @@
 {% block body_class %}staff{% endblock %}
 {% block content %}
 {% include "staff/_nav.html" %}
-<div class="title-row"><h1>{{ election.title }}</h1>{% if election.status == "open" %}<span class="live"><span class="dot" aria-hidden="true"></span>Live</span>{% endif %}</div>
+<p class="crumb no-print"><a href="{% url 'staff_election' election.pk %}">&larr; Manage {{ election.title }}</a></p>
+<div class="title-row">
+  <h1>{{ election.title }}</h1>
+  {% if election.status == "open" %}<span class="live"><span class="dot" aria-hidden="true"></span>Live</span>{% endif %}
+  <div class="actions tight no-print">
+    <a class="btn secondary sm" href="{% url 'staff_results_export' election.pk %}">Download CSV</a>
+    <button type="button" class="btn secondary sm" onclick="window.print()">Print</button>
+  </div>
+</div>
 <p class="lead">{{ election.get_status_display }} &middot; <span id="turnout">{{ turnout.voted }} of {{ turnout.registered }} registered voters have voted ({{ turnout.percent }}%)</span>{% if election.status == "open" %} &middot; updates every 10 seconds{% endif %}</p>
 {% include "voting/_results.html" %}
+<p class="print-only small">Printed {% now "j F Y, H:i" %} from UNN SUG E-Voting.</p>
 {% endblock %}
 {% block scripts %}
 {% if election.status == "open" %}

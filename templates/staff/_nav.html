@@ -1,9 +1,12 @@
 {% with name=request.resolver_match.url_name %}
 <nav class="tabs" aria-label="Committee">
   <a href="{% url 'staff_dashboard' %}"{% if name == 'staff_dashboard' %} aria-current="page"{% endif %}>Dashboard</a>
-  <a href="{% url 'staff_roll_upload' %}"{% if name == 'staff_roll_upload' %} aria-current="page"{% endif %}>Voter roll</a>
-  <a href="{% url 'admin:voting_election_changelist' %}">Elections &amp; candidates</a>
+  <a href="{% url 'staff_roll' %}"{% if name|slice:":10" == 'staff_roll' or name == 'staff_voter' %} aria-current="page"{% endif %}>Voter roll</a>
+  <a href="{% url 'staff_dashboard' %}#elections"{% if name|slice:":14" == 'staff_election' or name|slice:":14" == 'staff_position' or name|slice:":15" == 'staff_candidate' or name == 'staff_results' %} aria-current="page"{% endif %}>Elections</a>
   <a href="{% url 'staff_audit' %}"{% if name == 'staff_audit' %} aria-current="page"{% endif %}>Audit log</a>
-  <a href="{% url 'admin:index' %}">Admin</a>
+  <form method="post" action="{% url 'staff_logout' %}" class="tabs-end">
+    {% csrf_token %}
+    <button type="submit" class="linklike">Sign out{% if user.get_username %} <span class="muted">{{ user.get_username }}</span>{% endif %}</button>
+  </form>
 </nav>
 {% endwith %}

@@ -1,6 +1,7 @@
 from django import forms
+from django.core.files.uploadedfile import UploadedFile
 
-from .models import Voter
+from .models import Candidate, Election, Position, Voter
 from .roll import clean_reg_number, normalize
 
 
@@ -59,12 +60,66 @@ class VoteStartForm(forms.Form):
 
 
 class RollUploadForm(forms.Form):
-    file = forms.FileField(label="Voter roll (.csv)")
+    file = forms.FileField(label="Voter roll (.csv or .xlsx)")
 
     def clean_file(self):
         f = self.cleaned_data["file"]
-        if not f.name.lower().endswith(".csv"):
-            raise forms.ValidationError("Upload a .csv file.")
+        name = f.name.lower()
+        if name.endswith(".xls"):
+            raise forms.ValidationError(
+                "Old Excel .xls files are not supported. In Excel choose Save As, then .xlsx or CSV UTF-8."
+            )
+        if not name.endswith((".csv", ".xlsx")):
+            raise forms.ValidationError("Upload a .csv or .xlsx file.")
         if f.size > 10 * 1024 * 1024:
             raise forms.ValidationError("The file is larger than 10 MB.")
         return f
+
+
+class ElectionForm(forms.ModelForm):
+    class Meta:
+        model = Election
+        fields = ["title"]
+        labels = {"title": "Election title"}
+
+
+class PositionForm(forms.ModelForm):
+    class Meta:
+        model = Position
+        fields = ["title", "order"]
+        labels = {"title": "Position", "order": "Order on the ballot"}
+        help_texts = {"order": "Lower numbers appear first."}
+
+    def __init__(self, *args, election, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.instance.election = election
+
+    def clean_title(self):
+        title = " ".join(self.cleaned_data["title"].split())
+        clash = Position.objects.filter(election=self.instance.election, title__iexact=title)
+        if clash.exclude(pk=self.instance.pk).exists():
+            raise forms.ValidationError("This election already has that position.")
+        return title
+
+
+PHOTO_TYPES = (".jpg", ".jpeg", ".png", ".webp")
+
+
+class CandidateForm(forms.ModelForm):
+    class Meta:
+        model = Candidate
+        fields = ["name", "department", "manifesto", "photo"]
+        labels = {"name": "Full name", "photo": "Photo (optional)"}
+        widgets = {
+            "manifesto": forms.Textarea(attrs={"rows": 6}),
+            "photo": forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png,image/webp"}),
+        }
+
+    def clean_photo(self):
+        photo = self.cleaned_data.get("photo")
+        if isinstance(photo, UploadedFile):
+            if not photo.name.lower().endswith(PHOTO_TYPES):
+                raise forms.ValidationError("Use a JPG, PNG or WebP photo.")
+            if photo.size > 3 * 1024 * 1024:
+                raise forms.ValidationError("The photo is larger than 3 MB.")
+        return photo

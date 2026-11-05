@@ -6,8 +6,9 @@ OpenCV and DeepFace.
 
 ## How it works
 
-1. **Voter roll.** The electoral committee uploads a CSV of eligible students
-   at `/staff/roll/` with these headers:
+1. **Voter roll.** The electoral committee uploads a CSV or Excel (.xlsx)
+   sheet of eligible students at `/staff/roll/upload/` with these headers
+   (extra columns are ignored):
    `full_name, reg_number, faculty, department, level`
    (see `sample_voter_roll.csv`). Re-uploading updates existing students and
    keeps their face registration. If any row is invalid nothing is saved.
@@ -50,8 +51,9 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-Open http://127.0.0.1:8000. The committee logs in at `/admin/` and then uses
-`/staff/`.
+Open http://127.0.0.1:8000. The committee signs in at `/staff/login/` with
+the account made by `createsuperuser`. Add more committee members in `/admin/`
+(Users, tick *Staff status*).
 
 The first face scan downloads the Facenet512 (95 MB), RetinaFace and liveness
 (MiniFASNet) models to `~/.deepface`, so it is slow once. After that,
@@ -63,12 +65,18 @@ phone, see *Practice election* below.
 
 ## Setting up an election
 
-1. Upload the voter roll at `/staff/roll/`.
+Everything is done from the committee pages at `/staff/`:
+
+1. **Voter roll** tab: upload the roll, then search it, filter by faculty or
+   registration, open a student to clear a bad face registration or remove
+   them, and download the list as CSV.
 2. Let students register.
-3. In `/admin/`, add an Election, its Positions, and Candidates for each
-   position.
-4. On election day select the election and run the **Open voting** action.
-   Run **Close voting** when polls close.
+3. **Elections** tab: create an election, add its positions (in ballot order)
+   and candidates with photo, department and manifesto. The page lists what is
+   still missing before voting can open.
+4. On election day press **Open voting**. The ballot is locked from then on.
+   Press **Close voting** when polls close, then **Publish results**.
+5. The results page can be downloaded as CSV or printed.
 
 ## Practice election (phones over https)
 
