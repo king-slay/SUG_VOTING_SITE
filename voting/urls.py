@@ -41,4 +41,9 @@ urlpatterns = [
     path("staff/results/<int:election_id>/data/", staff_views.results_json, name="staff_results_json"),
     path("staff/results/<int:election_id>/export.csv", staff_views.results_export, name="staff_results_export"),
     path("staff/audit/", staff_views.audit_log, name="staff_audit"),
+    path("staff/committee/", staff_views.committee, name="staff_committee"),
+    path("staff/committee/new/", staff_views.committee_new, name="staff_committee_new"),
+    path("staff/committee/<int:user_id>/password/", staff_views.committee_password, name="staff_committee_password"),
+    path("staff/committee/<int:user_id>/change/", staff_views.committee_change, name="staff_committee_change"),
+    path("staff/password/", staff_views.my_password, name="staff_password"),
 ]

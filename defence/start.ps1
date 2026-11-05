@@ -10,10 +10,10 @@ Set-Location $root
 
 function Fail($message) { Write-Host "`n$message" -ForegroundColor Red; exit 1 }
 
-if (-not (Test-Path $python)) { Fail "No venv found in $root. Create it first (see README)." }
-if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
-    Fail "cloudflared is not installed. Run: winget install --id Cloudflare.cloudflared"
-}
+if (-not (Test-Path $python)) { Fail "The site is not installed on this laptop yet. Double-click defence\install.bat first." }
+$cloudflared = (Get-Command cloudflared -ErrorAction SilentlyContinue).Source
+if (-not $cloudflared -and (Test-Path "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe")) { $cloudflared = "${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe" }
+if (-not $cloudflared) { Fail "cloudflared is missing. Double-click defence\install.bat first." }
 
 # Production settings. The secret key is made once and kept in defence\secret.txt.
 $secretFile = Join-Path $here "secret.txt"
@@ -58,7 +58,7 @@ if (-not $up) { Stop-Process -Id $server.Id -ErrorAction SilentlyContinue; Fail 
 Write-Host "Opening the public link..."
 $log = Join-Path $here "tunnel.log"
 Remove-Item $log -ErrorAction SilentlyContinue
-$tunnel = Start-Process cloudflared -ArgumentList "tunnel", "--url", "http://localhost:8000" -RedirectStandardError $log -WindowStyle Hidden -PassThru
+$tunnel = Start-Process $cloudflared -ArgumentList "tunnel", "--url", "http://localhost:8000" -RedirectStandardError $log -WindowStyle Hidden -PassThru
 
 $url = $null
 foreach ($i in 1..60) {

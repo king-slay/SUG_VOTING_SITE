@@ -359,6 +359,88 @@ class StaffTests(TestCase):
         self.assertEqual(self.client.get(reverse("public_results", args=[election.pk])).status_code, 200)
 
 
+class CommitteeAccountTests(TestCase):
+    def setUp(self):
+        self.chair = User.objects.create_superuser("chair", "", "pass12345")
+        self.client.force_login(self.chair)
+
+    def add(self, username, chair=False):
+        data = {"username": username, "full_name": "Ada Obi", "password1": "Unn-vote-2026", "password2": "Unn-vote-2026"}
+        if chair:
+            data["chair"] = "on"
+        return self.client.post(reverse("staff_committee_new"), data)
+
+    def test_chair_adds_members_who_can_sign_in(self):
+        for name in ["ada", "bayo", "chika", "dayo"]:
+            self.assertRedirects(self.add(name), reverse("staff_committee"))
+        member = User.objects.get(username="ada")
+        self.assertTrue(member.is_staff)
+        self.assertFalse(member.is_superuser)
+        self.assertEqual(member.get_full_name(), "Ada Obi")
+        self.assertTrue(AuditLog.objects.filter(action="committee_added", user=self.chair).exists())
+        self.client.logout()
+        response = self.client.post(reverse("staff_login"), {"username": "ada", "password": "Unn-vote-2026"})
+        self.assertRedirects(response, reverse("staff_dashboard"))
+
+    def test_bad_passwords_and_duplicate_usernames_refused(self):
+        response = self.client.post(reverse("staff_committee_new"), {"username": "x", "password1": "123", "password2": "123"})
+        self.assertEqual(response.status_code, 200)
+        self.add("ada")
+        self.assertContains(self.add("ADA"), "already taken")
+        self.assertEqual(User.objects.filter(username__iexact="ada").count(), 1)
+
+    def test_members_cannot_manage_accounts(self):
+        self.add("ada")
+        self.client.force_login(User.objects.get(username="ada"))
+        self.assertRedirects(self.client.get(reverse("staff_committee")), reverse("staff_dashboard"))
+        self.client.post(reverse("staff_committee_change", args=[self.chair.pk]), {"action": "disable"})
+        self.chair.refresh_from_db()
+        self.assertTrue(self.chair.is_active)
+        self.assertNotContains(self.client.get(reverse("staff_dashboard")), reverse("staff_committee"))
+
+    def test_switch_off_and_promote(self):
+        self.add("ada")
+        ada = User.objects.get(username="ada")
+        url = reverse("staff_committee_change", args=[ada.pk])
+        self.client.post(url, {"action": "chair"})
+        ada.refresh_from_db()
+        self.assertTrue(ada.is_superuser)
+        self.client.post(url, {"action": "disable"})
+        ada.refresh_from_db()
+        self.assertFalse(ada.is_active)
+        self.client.logout()
+        self.client.post(reverse("staff_login"), {"username": "ada", "password": "Unn-vote-2026"})
+        self.assertEqual(self.client.get(reverse("staff_dashboard")).status_code, 302)
+
+    def test_cannot_switch_off_or_demote_yourself(self):
+        url = reverse("staff_committee_change", args=[self.chair.pk])
+        for action in ["disable", "member"]:
+            self.client.post(url, {"action": action})
+        self.chair.refresh_from_db()
+        self.assertTrue(self.chair.is_active and self.chair.is_superuser)
+
+    def test_reset_and_change_password(self):
+        self.add("ada")
+        ada = User.objects.get(username="ada")
+        self.client.post(reverse("staff_committee_password", args=[ada.pk]),
+                         {"new_password1": "Fresh-pass-77", "new_password2": "Fresh-pass-77"})
+        ada.refresh_from_db()
+        self.assertTrue(ada.check_password("Fresh-pass-77"))
+        self.client.force_login(ada)
+        response = self.client.post(reverse("staff_password"), {
+            "old_password": "Fresh-pass-77", "new_password1": "Mine-only-88", "new_password2": "Mine-only-88"})
+        self.assertRedirects(response, reverse("staff_dashboard"))
+        ada.refresh_from_db()
+        self.assertTrue(ada.check_password("Mine-only-88"))
+        self.assertTrue(AuditLog.objects.filter(action="committee_password_changed").exists())
+
+    def test_committee_page_lists_accounts(self):
+        self.add("ada")
+        response = self.client.get(reverse("staff_committee"))
+        self.assertContains(response, "ada")
+        self.assertContains(response, "Chair")
+
+
 def xlsx_file(rows):
     import io
 

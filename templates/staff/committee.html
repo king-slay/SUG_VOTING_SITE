@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Committee accounts | UNN SUG E-Voting{% endblock %}
+{% block body_class %}staff{% endblock %}
+{% block content %}
+{% include "staff/_nav.html" %}
+<div class="title-row">
+  <h1>Committee accounts</h1>
+  <a class="btn sm" href="{% url 'staff_committee_new' %}">Add a member</a>
+</div>
+<p class="small muted">Each committee member signs in with their own account, so the audit log shows who did what. Chairs can add members and manage accounts. Nobody can switch off or demote their own account, so there is always a chair left.</p>
+<section class="panel flush">
+  <div class="table-wrap">
+    <table class="log">
+      <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Last sign-in</th><th></th></tr></thead>
+      <tbody>
+      {% for m in members %}
+        <tr>
+          <td><strong>{{ m.username }}</strong>{% if m == user %} <span class="muted">(you)</span>{% endif %}</td>
+          <td>{{ m.get_full_name|default:"–" }}</td>
+          <td>{% if not m.is_active %}<span class="pill">Switched off</span>{% elif m.is_superuser %}<span class="pill open">Chair</span>{% else %}<span class="pill">Member</span>{% endif %}</td>
+          <td class="nowrap tnum">{{ m.last_login|date:"j M Y, H:i"|default:"Never" }}</td>
+          <td>
+            <div class="row-actions">
+              <a class="btn secondary sm" href="{% url 'staff_committee_password' m.pk %}">New password</a>
+              {% if m != user %}
+                <form method="post" action="{% url 'staff_committee_change' m.pk %}">
+                  {% csrf_token %}
+                  {% if m.is_active %}
+                    {% if m.is_superuser %}<button class="btn secondary sm" name="action" value="member">Make member</button>{% else %}<button class="btn secondary sm" name="action" value="chair">Make chair</button>{% endif %}
+                  {% endif %}
+                </form>
+                <form method="post" action="{% url 'staff_committee_change' m.pk %}"{% if m.is_active %} data-confirm="Switch off {{ m.username }}? They will not be able to sign in."{% endif %}>
+                  {% csrf_token %}
+                  {% if m.is_active %}<button class="btn danger sm" name="action" value="disable">Switch off</button>{% else %}<button class="btn secondary sm" name="action" value="enable">Switch on</button>{% endif %}
+                </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}{% include "staff/_confirm.html" %}{% endblock %}
