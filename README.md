@@ -2,7 +2,7 @@
 
 A web-based facial recognition e-voting system for Students' Union Government
 elections at the University of Nigeria, Nsukka. Built with Django, MySQL,
-OpenCV and DeepFace.
+OpenCV, InsightFace's ArcFace model and DeepFace.
 
 ## How it works
 
@@ -16,7 +16,7 @@ OpenCV and DeepFace.
    cross-checked against the roll (case and extra spaces are ignored). The
    student adds email and phone and captures their face with the webcam. The
    camera takes three photos a moment apart; each is turned into an embedding
-   (Facenet512), and if they agree, their average is stored. Every face scan
+   (ArcFace, see *Face recognition* below), and if they agree, their average is stored. Every face scan
    first passes a liveness check (see below). A face that is
    already registered to another reg number is refused, so one person cannot
    register twice. Registration closes while an election is open.
@@ -55,10 +55,14 @@ Open http://127.0.0.1:8000. The committee signs in at `/staff/login/` with
 the account made by `createsuperuser`. Add more committee members in `/admin/`
 (Users, tick *Staff status*).
 
-The first face scan downloads the Facenet512 (95 MB), RetinaFace and liveness
-(MiniFASNet) models to `~/.deepface`, so it is slow once. After that,
-`runserver` loads the models in the background as it starts (it prints
-"Face models loaded"), so the first voter after a restart does not wait for them.
+The first time `runserver` starts it downloads the ArcFace recognition model
+(InsightFace's 288 MB `buffalo_l.zip`, of which it keeps the 174 MB
+`w600k_r50.onnx`) to `~/.unnvote/models`, and the liveness model (MiniFASNet) to
+`~/.deepface`. After that, `runserver` loads the models in the background as it
+starts (it prints "Face models loaded"), so the first voter after a restart does
+not wait for them. If the download fails, download `buffalo_l.zip` from
+https://github.com/deepinsight/insightface/releases/tag/v0.7 yourself and put
+`w600k_r50.onnx` from it in `~/.unnvote/models`.
 
 **Camera access only works on `localhost` or over `https`.** To test from a
 phone, see *Practice election* below.
@@ -109,6 +113,26 @@ Open that on the phones. The address changes each time `cloudflared` restarts.
 While `DJANGO_DEBUG` is on (the default), the site accepts `*.trycloudflare.com`
 addresses without extra settings.
 
+## Face recognition
+
+Each snapshot goes through three steps (`voting/faces.py`):
+
+1. **Find the face.** OpenCV's YuNet detector finds the face and five landmarks
+   (eyes, nose, mouth corners). No face, more than one face, or a face too far
+   from the camera is refused with a message telling the voter what to fix.
+2. **Liveness.** DeepFace's MiniFASNet checks the face is live (below).
+3. **Recognise.** The face is aligned on its landmarks and InsightFace's ArcFace
+   model (`buffalo_l` / `w600k_r50`, run with ONNX Runtime, so no compiler is
+   needed on Windows) turns it into 512 numbers. Two faces are compared by cosine
+   distance.
+
+ArcFace replaced DeepFace's Facenet512 in November 2026 because Facenet512 let a
+sibling pass as his brother in the practice election. On DeepFace's 300 labelled
+test photo pairs, the closest two different people scored 0.80 with ArcFace
+against 0.48 with Facenet512, and a scan takes about 0.5 s against about 2 s.
+Face records made with Facenet512 are cleared by migration `0002`, so those
+students register again.
+
 ## Liveness check (anti-spoofing)
 
 Every face scan (registration, accreditation and ballot submit) runs DeepFace's
@@ -132,13 +156,13 @@ conditions; the voter just tries again in better light. Turn it off with
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` (plus `.trycloudflare.com` while debugging) | Comma-separated host names |
 | `DJANGO_CSRF_TRUSTED_ORIGINS` | `https://*.trycloudflare.com` while debugging, else empty | e.g. `https://vote.example.com` |
 | `MYSQL_DATABASE`, `MYSQL_USER`, `MYSQL_PASSWORD`, `MYSQL_HOST`, `MYSQL_PORT` | | Use MySQL when `MYSQL_DATABASE` is set, otherwise SQLite |
-| `FACE_MODEL` | `Facenet512` | DeepFace model |
-| `FACE_DETECTOR` | `retinaface` | DeepFace face detector (`opencv` is faster but misses more faces) |
-| `FACE_MATCH_THRESHOLD` | `0.25` | Max cosine distance to accept a face match |
-| `FACE_MATCH_MARGIN` | `0.08` | Refuse a scan when another registered face is within this distance of the claimed one (too close to call, e.g. siblings) |
-| `FACE_ENROL_CONSISTENCY` | `0.15` | Registration takes 3 photos and stores their average; refused if any two differ by more than this |
+| `FACE_MODEL_DIR` | `~/.unnvote/models` | Where the ArcFace model is downloaded to |
+| `FACE_MATCH_THRESHOLD` | `0.45` | Max cosine distance to accept a face match |
+| `FACE_MATCH_MARGIN` | `0.10` | Refuse a scan when another registered face is within this distance of the claimed one (too close to call, e.g. siblings) |
+| `FACE_ENROL_CONSISTENCY` | `0.25` | Registration takes 3 photos and stores their average; refused if any two differ by more than this |
 | `FACE_DUPLICATE_THRESHOLD` | same as `FACE_MATCH_THRESHOLD` | Distance under which a new registration counts as an already-registered face |
 | `FACE_ANTI_SPOOFING` | `true` | Liveness check that rejects photos and screens held up to the camera |
+| `FACE_MIN_SIZE` | `80` | Smallest face (pixels) accepted; smaller means the voter is too far away |
 | `VOTE_SESSION_MINUTES` | `10` | Time allowed between accreditation and submitting the ballot |
 
 ## Tests
@@ -156,7 +180,8 @@ unnvote/          Django settings and root URLs
 voting/
   models.py       Voter, Election, Position, Candidate, Participation, Vote, AuditLog
   roll.py         CSV voter roll import
-  faces.py        DeepFace embedding and matching
+  faces.py        Face detection (YuNet), liveness (DeepFace), ArcFace embedding and matching
+  face_models/    The YuNet detector model (230 KB)
   views.py        Registration, accreditation, ballot, public results
   staff_views.py  Committee dashboard, roll upload, live results, audit log
   management/commands/practice_election.py  Mock election setup, report, reset

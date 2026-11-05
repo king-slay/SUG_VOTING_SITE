@@ -31,6 +31,13 @@ FAKE_FACES = {
 }
 
 
+# The fake faces above were laid out for these limits, so the tests pin them instead of
+# following whatever the real model's defaults are.
+fake_face_limits = override_settings(
+    FACE_MATCH_THRESHOLD=0.25, FACE_MATCH_MARGIN=0.08, FACE_DUPLICATE_THRESHOLD=0.25, FACE_ENROL_CONSISTENCY=0.15,
+)
+
+
 def photo(name):
     """A fake webcam data URL whose payload is just the person's name."""
     return "data:image/jpeg;base64," + base64.b64encode(name.encode()).decode()
@@ -98,6 +105,7 @@ class RollImportTests(TestCase):
 
 @mock.patch("voting.faces.get_embedding", side_effect=fake_embedding)
 @override_settings(MEDIA_ROOT=tempfile.mkdtemp(prefix="unnvote-test-media-"))
+@fake_face_limits
 class RegistrationTests(TestCase):
     def setUp(self):
         import_roll(csv_file(ROLL))
@@ -187,6 +195,7 @@ class RegistrationTests(TestCase):
 
 
 @mock.patch("voting.faces.get_embedding", side_effect=fake_embedding)
+@fake_face_limits
 class VotingTests(TestCase):
     def setUp(self):
         import_roll(csv_file(ROLL))
@@ -532,18 +541,68 @@ class FaceMathTests(TestCase):
         with self.assertRaises(faces.FaceError):
             faces.decode_data_url("data:image/jpeg;base64,not-an-image!!")
 
-    @mock.patch("deepface.DeepFace.represent", side_effect=ValueError("Spoof detected in the given image."))
-    def test_deepface_spoof_becomes_spoof_error(self, represent):
-        import cv2
+
+
+def jpeg_url():
+    import cv2
+    import numpy as np
+
+    ok, jpeg = cv2.imencode(".jpg", np.zeros((480, 640, 3), dtype=np.uint8))
+    return "data:image/jpeg;base64," + base64.b64encode(jpeg.tobytes()).decode()
+
+
+def detection(size=200):
+    """One YuNet row: box, five landmarks, score."""
+    import numpy as np
+
+    return np.array([200, 100, size, size, 260, 170, 340, 170, 300, 220, 270, 260, 330, 260, 0.95])
+
+
+class FakeSession:
+    def get_inputs(self):
+        return [mock.Mock(name="input")]
+
+    def run(self, outputs, feed):
         import numpy as np
 
-        ok, jpeg = cv2.imencode(".jpg", np.zeros((8, 8, 3), dtype=np.uint8))
-        with self.assertRaises(faces.SpoofError):
-            faces.get_embedding("data:image/jpeg;base64," + base64.b64encode(jpeg.tobytes()).decode())
-        self.assertIs(represent.call_args.kwargs["anti_spoofing"], True)
+        (blob,) = feed.values()
+        assert blob.shape == (1, 3, 112, 112)
+        return [np.full((1, 512), 2.0)]
+
+
+@override_settings(FACE_ANTI_SPOOFING=True)
+@mock.patch("voting.faces.recognizer", return_value=FakeSession())
+class FacePipelineTests(TestCase):
+    def test_one_face_gives_unit_embedding(self, _):
+        with mock.patch("voting.faces.detect_faces", return_value=[detection()]), \
+                mock.patch("voting.faces.check_liveness") as liveness:
+            embedding = faces.get_embedding(jpeg_url())
+        self.assertEqual(len(embedding), 512)
+        self.assertAlmostEqual(sum(v * v for v in embedding), 1.0)
+        liveness.assert_called_once()
+
+    def test_spoof_rejected(self, _):
+        fasnet = mock.Mock()
+        fasnet.analyze.return_value = (False, 0.97)
+        with mock.patch("voting.faces.detect_faces", return_value=[detection()]), \
+                mock.patch("deepface.modules.modeling.build_model", return_value=fasnet):
+            with self.assertRaises(faces.SpoofError):
+                faces.get_embedding(jpeg_url())
+        self.assertEqual(fasnet.analyze.call_args.kwargs["facial_area"], (200, 100, 200, 200))
+
+    def test_no_face_two_faces_small_face(self, _):
+        for found, message in [([], "No face"), ([detection(), detection()], "More than one"),
+                               ([detection(size=40)], "too far")]:
+            with mock.patch("voting.faces.detect_faces", return_value=found):
+                with self.assertRaisesMessage(faces.FaceError, message):
+                    faces.get_embedding(jpeg_url())
+
+    def test_detector_runs_on_a_blank_frame(self, _):
+        self.assertEqual(faces.detect_faces(faces.decode_data_url(jpeg_url())), [])
 
 
 @mock.patch("voting.faces.get_embedding", side_effect=fake_embedding)
+@fake_face_limits
 class PracticeElectionTests(TestCase):
     def call(self, *args):
         from io import StringIO
