@@ -118,8 +118,17 @@ addresses without extra settings.
 Free cloud servers were not an option, so on defence day the site runs on the laptop and a
 Cloudflare quick tunnel gives it a public https address that any phone can open.
 
-1. Once: `pip install -r requirements.txt` in the venv, and `winget install --id Cloudflare.cloudflared`.
-2. Double-click `defence\start.bat`. It:
+The step-by-step guide for the people running the defence is [README.txt](README.txt).
+
+1. Once per laptop: double-click `defence\install.bat`. It runs ten parts (folder check,
+   Python 3.10-3.12 64-bit, long paths, cloudflared, venv, packages, face models, database,
+   first chair account, desktop shortcut). A part that fails does not stop the others; a
+   summary at the end says what to fix, and everything is logged to `defence\install-log.txt`.
+   The venv goes in `%LOCALAPPDATA%\unnvote\venv` (short path, outside OneDrive, not copied
+   with the folder), falling back to `C:\unnvote\venv`, then `venv\` in the project. If
+   `ensurepip` fails, the venv is made `--without-pip` and pip is fetched with get-pip.py.
+   If installing all packages at once fails, they are retried one by one.
+2. Double-click `defence\start.bat` (or the desktop shortcut). It:
    - turns on production mode (DEBUG off, a secret key kept in `defence\secret.txt`),
    - migrates the database and collects static files,
    - starts the site with waitress on port 8000 (its log opens in a second window),
@@ -128,6 +137,12 @@ Cloudflare quick tunnel gives it a public https address that any phone can open.
 
 The link changes every time the kit starts, so print the QR page only after starting it.
 Extra settings, such as the `MYSQL_` ones, can go in `defence\local.env`, one `NAME=value` per line.
+`defence\manage.bat <command>` runs any management command with the installed Python,
+e.g. `defence\manage.bat createsuperuser`.
+
+Committee accounts: each member has their own login. Chairs (superusers) manage them under
+**Committee** in `/staff/` (add, new password, switch off, make chair); everyone can change
+their own password under **My password**. Nobody can switch off or demote themselves.
 
 ## Hosting (Oracle Cloud Always Free)
 

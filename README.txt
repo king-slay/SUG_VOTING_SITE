@@ -24,7 +24,13 @@ What the laptop needs: Windows 10 or 11, internet, a webcam, and about 4 GB free
       Password: type it twice (it does not show while you type; write it down)
  4. When it says "All set", a "Start UNN Voting" icon is on the desktop.
 
-You can run install.bat again at any time. It skips anything already installed.
+The installer works in 10 parts. If one part fails, it carries on with the
+others and shows a SUMMARY at the end: OK, WARNING (not needed to run), FAILED
+or SKIPPED (waiting for a failed part), each with what to do. Fix what it says
+and run install.bat again: the parts that already worked are quick the second
+time. Everything on screen is also saved in  defence\install-log.txt  - send
+that file to the developer if you are stuck. The big download (TensorFlow) can
+look frozen for 10 minutes or more on slow internet; leave it running.
 
 
 2. EVERY TIME YOU WANT THE SITE RUNNING
@@ -56,7 +62,7 @@ account: the audit log records which account did what.
  - Nobody can switch off or demote their own account, so a chair always remains.
  - If every chair is locked out: open the project folder, click the address bar,
    type  cmd  and press Enter, then run:
-       venv\Scripts\python manage.py createsuperuser
+       defence\manage.bat createsuperuser
 
 
 4. RUNNING AN ELECTION (the order matters)
@@ -110,5 +116,14 @@ Only run the site on ONE laptop at a time. Two laptops do not share data.
    face filling the oval. If they registered badly, a committee member opens
    Voter roll > the student > "Clear face registration" so they can register again
    (only while voting is closed).
+ - Installer problems: read the SUMMARY at the end of the install window.
+     * "Python" failed: install Python 3.12 64-bit from python.org (tick
+       "Add python.exe to PATH"), then run install.bat again. Python 3.13 or
+       newer does not work.
+     * "venv" failed: usually antivirus blocking python.exe. Allow it (or pause
+       protection for a few minutes) and run install.bat again.
+     * "Python packages" failed: usually the internet dropped. Run it again; it
+       continues where it stopped.
+     * Running from inside the zip: extract the zip first (right-click > Extract All).
  - Something red in a black window: take a photo or screenshot of it and send
    it to the developer.

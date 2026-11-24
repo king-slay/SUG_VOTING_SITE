@@ -12,3 +12,4 @@ defence/secret.txt
 defence/local.env
 defence/link.html
 defence/*.log
+defence/install-log.txt
